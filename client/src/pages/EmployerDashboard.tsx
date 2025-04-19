@@ -528,7 +528,7 @@ export default function EmployerDashboard() {
   if (!user || user.role !== "employer") {
     return (
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-4">Employer Dashboard</h1>
+        <h1 className="text-2xl font-bold mb-4">Company Dashboard</h1>
         <p>You must be signed in as an employer to access this page.</p>
       </div>
     );
@@ -538,7 +538,7 @@ export default function EmployerDashboard() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Employer Dashboard</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Company Dashboard</h1>
           <p className="text-muted-foreground">Manage internships and applications for {companyInfo.name}</p>
         </div>
         <Button 

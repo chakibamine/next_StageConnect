@@ -331,6 +331,7 @@ const Header = () => {
                   </DropdownMenuItem>
                 </div>
                 <DropdownMenuSeparator />
+                <Link href="/login">
                 <DropdownMenuItem 
                   onClick={logout} 
                   className="focus:bg-[#0A77FF]/10 focus:text-[#0A77FF]"
@@ -338,6 +339,7 @@ const Header = () => {
                   <LogOutIcon className="h-4 w-4 mr-2" />
                   Sign Out
                 </DropdownMenuItem>
+                </Link>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (

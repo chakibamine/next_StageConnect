@@ -275,9 +275,6 @@ export default function SupervisorDashboard() {
         <TabsList className="w-full justify-start border-b pb-0">
           <TabsTrigger value="overview" className="rounded-b-none">Overview</TabsTrigger>
           <TabsTrigger value="students" className="rounded-b-none">Students</TabsTrigger>
-          <TabsTrigger value="internships" className="rounded-b-none">Internships</TabsTrigger>
-          <TabsTrigger value="applications" className="rounded-b-none">Applications</TabsTrigger>
-          <TabsTrigger value="approvals" className="rounded-b-none">Approvals</TabsTrigger>
           <TabsTrigger value="reports" className="rounded-b-none">Reports</TabsTrigger>
         </TabsList>
 

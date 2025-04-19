@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import EmployerProfile from "./pages/EmployerProfile";
+import LandingPage from "./pages/LandingPage";
 
 function App() {
   return (
@@ -45,7 +46,8 @@ function AppContent() {
         <Switch>
           {!isAuthenticated ? (
             <>
-              <Route path="/" component={Login} />
+              <Route path="/" component={LandingPage} />
+              <Route path="/login" component={Login} />
               <Route path="/register" component={Register} />
             </>
           ) : (
@@ -84,9 +86,6 @@ function AppContent() {
                   <Route path="/network" component={Network} />
                   <Route path="/internships" component={Internships} />
                   <Route path="/internships/:id" component={InternshipDetail} />
-
-
-
                 </>
               )}
               

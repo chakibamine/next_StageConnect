@@ -86,11 +86,11 @@ const Footer = () => {
           </div>
           
           <div>
-            <h3 className="font-semibold text-neutral-900 mb-4">For Employers</h3>
+            <h3 className="font-semibold text-neutral-900 mb-4">For Companies</h3>
             <ul className="space-y-3">
               <li>
                 <Link href="/employer-dashboard" className="text-sm text-neutral-600 hover:text-[#0A77FF] hover:underline">
-                  Employer Dashboard
+                   Company Dashboard
                 </Link>
               </li>
               <li>
