@@ -14,6 +14,7 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import EmployerDashboard from "@/pages/EmployerDashboard";
 import SupervisorDashboard from "@/pages/SupervisorDashboard";
+import Notifications from "@/pages/Notifications";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { useAuth } from "@/contexts/AuthContext";
@@ -51,6 +52,7 @@ function AppContent() {
             <>
               {/* Common routes for all users */}
               <Route path="/messaging" component={Messaging} />
+              <Route path="/notifications" component={Notifications} />
               {/* <Route path="/profile" component={Profile} /> */}
               
               {/* Role-specific home routes */}
@@ -79,6 +81,12 @@ function AppContent() {
                 <>
                   <Route path="/employer-dashboard" component={EmployerDashboard} />
                   <Route path="/profile" component={EmployerProfile} />
+                  <Route path="/network" component={Network} />
+                  <Route path="/internships" component={Internships} />
+                  <Route path="/internships/:id" component={InternshipDetail} />
+
+
+
                 </>
               )}
               
