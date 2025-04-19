@@ -1,0 +1,1931 @@
+import { useState, useEffect } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  CalendarIcon, 
+  MapPinIcon, 
+  BriefcaseIcon, 
+  MailIcon, 
+  PhoneIcon, 
+  GlobeIcon, 
+  PenIcon, 
+  UserIcon, 
+  PlusIcon, 
+  LinkIcon, 
+  BuildingIcon,
+  UsersIcon,
+  FileTextIcon,
+  UploadIcon,
+  FileDownIcon,
+  EyeIcon,
+  TrashIcon,
+  XIcon,
+  ClockIcon,
+  CheckIcon,
+  AwardIcon,
+  TrophyIcon,
+  BarChartIcon
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import CreatePost from "@/components/profile/CreatePost";
+import PostCard from "@/components/profile/PostCard";
+import { Post } from "@shared/schema";
+import CompanyProfileEditForm from "@/components/profile/CompanyProfileEditForm";
+import { Label } from "@/components/ui/label";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { Award, Medal, Star } from "lucide-react";
+import EditItemDialog from "@/components/profile/EditItemDialog";
+
+// Define employer profile interfaces
+interface CompanyInfo {
+  name: string;
+  industry: string;
+  size: string;
+  founded: string;
+  website: string;
+  location: string;
+  description: string;
+  logo: string;
+}
+
+interface ContactInfo {
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  postalCode: string;
+  country: string;
+}
+
+// Add internship interface after the other interfaces
+interface Internship {
+  id: number;
+  title: string;
+  department: string;
+  location: string;
+  workType: string;
+  duration: string;
+  compensation: string;
+  applicants: number;
+  status: string;
+  posted: string;
+  deadline: string;
+}
+
+// Add new editable content interfaces
+interface Achievement {
+  id: number;
+  title: string;
+  description: string;
+  icon: "award" | "trophy" | "chart"; // Corresponds to icon type
+}
+
+interface Project {
+  id: number;
+  title: string;
+  description: string;
+  tags: string[];
+}
+
+interface Client {
+  id: number;
+  name: string;
+}
+
+interface TeamMember {
+  id: number;
+  name: string;
+  role: string;
+  bio: string;
+  imageUrl: string;
+}
+
+interface InsightItem {
+  id: number;
+  title: string;
+  description: string;
+  linkText: string;
+}
+
+const EmployerProfile = () => {
+  const { user } = useAuth();
+  const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+
+  // Company profile state
+  const [company, setCompany] = useState<CompanyInfo>({
+    name: "TechInnovate Solutions",
+    industry: "Software Development",
+    size: "50-100",
+    founded: "2015",
+    website: "techinnovate.com",
+    location: "Paris, France",
+    description: "TechInnovate Solutions is a leading technology company specializing in innovative software solutions for businesses. We focus on creating user-friendly applications that solve real-world problems and enhance productivity.",
+    logo: "https://images.unsplash.com/photo-1569369926046-3015a262bba8?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80"
+  });
+
+  const [contactInfo, setContactInfo] = useState<ContactInfo>({
+    email: "contact@techinnovate.com",
+    phone: "+33 1 23 45 67 89",
+    address: "123 Tech Boulevard",
+    city: "Paris",
+    postalCode: "75001",
+    country: "France"
+  });
+
+  // Temporary state for editing
+  const [tempCompany, setTempCompany] = useState<CompanyInfo>({...company});
+  const [tempContactInfo, setTempContactInfo] = useState<ContactInfo>({...contactInfo});
+  
+  // Posts for the company's feed
+  const [posts, setPosts] = useState<Post[]>([
+    {
+      id: 1,
+      content: "We're excited to announce that we're now hiring for several internship positions! Visit our careers page to learn more. #Internships #JobOpportunities #TechCareers",
+      authorId: 1,
+      image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&h=400&q=80",
+      createdAt: new Date(new Date().getTime() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+      likeCount: 45,
+      commentCount: 12,
+    },
+    {
+      id: 2,
+      content: "Proud to announce our partnership with Paris University to provide mentorship and internship opportunities for computer science students. Looking forward to meeting the next generation of tech talent!",
+      authorId: 1,
+      image: null,
+      createdAt: new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000), // 1 week ago
+      likeCount: 72,
+      commentCount: 18,
+    },
+  ]);
+
+  // Add internship management state
+  const [internships, setInternships] = useState<Internship[]>([
+    {
+      id: 1,
+      title: "UX/UI Design Intern",
+      department: "Design",
+      location: "Paris, France",
+      workType: "on-site",
+      duration: "3 months",
+      compensation: "€800/month",
+      applicants: 8,
+      status: "active",
+      posted: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+      deadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 2,
+      title: "Frontend Developer Intern",
+      department: "Engineering",
+      location: "Paris, France",
+      workType: "hybrid",
+      duration: "6 months",
+      compensation: "€950/month",
+      applicants: 12,
+      status: "active",
+      posted: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+      deadline: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 3,
+      title: "Marketing Intern",
+      department: "Marketing",
+      location: "Remote",
+      workType: "remote",
+      duration: "4 months",
+      compensation: "€700/month",
+      applicants: 4,
+      status: "active",
+      posted: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+      deadline: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString(),
+    }
+  ]);
+
+  // Add editable content state
+  const [achievements, setAchievements] = useState<Achievement[]>([
+    {
+      id: 1,
+      title: "Best Workplace Award 2023",
+      description: "Recognized as one of the top employers in the technology sector for our innovative work culture and employee benefits.",
+      icon: "award"
+    },
+    {
+      id: 2,
+      title: "Technology Innovation Prize",
+      description: "Our flagship product received the Technology Innovation Prize at the European Tech Summit.",
+      icon: "trophy"
+    },
+    {
+      id: 3,
+      title: "50% Annual Growth",
+      description: "Achieved consistent growth over the past three years, expanding our team and client base significantly.",
+      icon: "chart"
+    }
+  ]);
+
+  const [projects, setProjects] = useState<Project[]>([
+    {
+      id: 1,
+      title: "Enterprise Resource Management Platform",
+      description: "A comprehensive solution for large enterprises to manage resources, streamline operations, and increase productivity.",
+      tags: ["React", "Node.js", "MongoDB"]
+    },
+    {
+      id: 2,
+      title: "Smart City Infrastructure System",
+      description: "IoT-powered infrastructure management system deployed in three major European cities.",
+      tags: ["IoT", "Python", "Data Analytics"]
+    }
+  ]);
+
+  const [clients, setClients] = useState<Client[]>([
+    { id: 1, name: "Global Tech Inc." },
+    { id: 2, name: "EuroFinance" },
+    { id: 3, name: "MedSolutions" },
+    { id: 4, name: "RetailDirect" }
+  ]);
+
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
+    {
+      id: 1,
+      name: "Jean Dupont",
+      role: "Chief Executive Officer",
+      bio: "20+ years of experience in the technology sector, previously founded two successful startups.",
+      imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=crop&w=120&q=80"
+    },
+    {
+      id: 2,
+      name: "Sophie Martin",
+      role: "Chief Technology Officer",
+      bio: "Former lead engineer at a Fortune 500 company, with expertise in cloud infrastructure and AI.",
+      imageUrl: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?ixlib=rb-1.2.1&auto=format&fit=crop&w=120&q=80"
+    },
+    {
+      id: 3,
+      name: "Thomas Laurent",
+      role: "Chief Operating Officer",
+      bio: "Specializes in streamlining operations and scaling businesses efficiently.",
+      imageUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?ixlib=rb-1.2.1&auto=format&fit=crop&w=120&q=80"
+    },
+    {
+      id: 4,
+      name: "Emma Rousseau",
+      role: "Chief Marketing Officer",
+      bio: "Award-winning marketer with a background in digital strategies for tech companies.",
+      imageUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-1.2.1&auto=format&fit=crop&w=120&q=80"
+    }
+  ]);
+
+  const [insights, setInsights] = useState<InsightItem[]>([
+    {
+      id: 1,
+      title: "The Future of Enterprise Software",
+      description: "Our research team has published a comprehensive white paper on emerging trends in enterprise software, focusing on AI integration, microservices architecture, and enhanced security protocols.",
+      linkText: "Read White Paper"
+    },
+    {
+      id: 2,
+      title: "Digital Transformation Roadmap",
+      description: "Our latest case study explores how businesses can navigate digital transformation challenges, with actionable steps and metrics for measuring success.",
+      linkText: "View Case Study"
+    }
+  ]);
+
+  // Dialog state for editing different content types
+  const [showItemDialog, setShowItemDialog] = useState(false);
+  const [itemType, setItemType] = useState<"achievement" | "project" | "client" | "teamMember" | "insight" | null>(null);
+  const [currentItem, setCurrentItem] = useState<any>(null);
+
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{id: number, type: string} | null>(null);
+
+  const [showInternshipDialog, setShowInternshipDialog] = useState(false);
+  const [currentInternship, setCurrentInternship] = useState<Internship | null>(null);
+  const [internshipForm, setInternshipForm] = useState({
+    title: "",
+    department: "",
+    location: "",
+    workType: "on-site",
+    duration: "",
+    compensation: "",
+    deadline: ""
+  });
+
+  // Generic form state for editing different content types
+  const [itemForm, setItemForm] = useState<any>({});
+
+  const [showAboutDialog, setShowAboutDialog] = useState(false);
+  const [showTechnologiesDialog, setShowTechnologiesDialog] = useState(false);
+  const [showLegalDialog, setShowLegalDialog] = useState(false);
+  const [showSocialMediaDialog, setShowSocialMediaDialog] = useState(false);
+  
+  // Add state for technologies
+  const [technologies, setTechnologies] = useState([
+    "React", "TypeScript", "Node.js", "Next.js", 
+    "Python", "Django", "PostgreSQL", "MongoDB",
+    "AWS", "Docker", "Kubernetes", "CI/CD"
+  ]);
+  
+  // Add state for legal information
+  const [legalInfo, setLegalInfo] = useState({
+    registrationNumber: "RCS Paris B 123 456 789",
+    vatId: "FR 12 345 678 901",
+    legalForm: "Société par Actions Simplifiée (SAS)"
+  });
+  
+  // Add state for social media
+  const [socialMedia, setSocialMedia] = useState({
+    linkedin: { active: true, url: "https://linkedin.com/company/techinnovate" },
+    twitter: { active: true, url: "https://twitter.com/techinnovate" },
+    instagram: { active: true, url: "https://instagram.com/techinnovate" },
+    facebook: { active: true, url: "https://facebook.com/techinnovate" }
+  });
+  
+  // Temporary state for editing
+  const [tempTechnologies, setTempTechnologies] = useState<string[]>([...technologies]);
+  const [tempLegalInfo, setTempLegalInfo] = useState({...legalInfo});
+  const [tempSocialMedia, setTempSocialMedia] = useState({...socialMedia});
+  const [tempAboutInfo, setTempAboutInfo] = useState({
+    mission: "At " + company.name + ", our mission is to empower businesses with innovative technology solutions that drive growth and efficiency. We believe in creating software that puts users first and solves real-world problems through thoughtful design and robust engineering.",
+    history: "Founded in " + company.founded + " by a team of industry veterans, " + company.name + " started with a vision to bridge the gap between complex technological capabilities and user-friendly applications. What began as a small operation with a handful of employees has now grown into a leading technology provider with clients across Europe and North America.",
+    responsibility: company.name + " is committed to making a positive impact beyond our business operations. We have implemented sustainable practices throughout our organization, supported local community initiatives, and established a foundation that focuses on improving technology education and access for underserved communities."
+  });
+  
+  // Add handlers for each dialog
+  const handleOpenAboutDialog = () => {
+    setTempAboutInfo({...tempAboutInfo});
+    setShowAboutDialog(true);
+  };
+  
+  const handleSaveAboutInfo = () => {
+    setTempAboutInfo(tempAboutInfo);
+    setShowAboutDialog(false);
+    toast({
+      title: "About information updated",
+      description: "Your company's about information has been updated successfully.",
+    });
+  };
+  
+  const handleOpenTechnologiesDialog = () => {
+    setTempTechnologies([...technologies]);
+    setShowTechnologiesDialog(true);
+  };
+  
+  const handleSaveTechnologies = () => {
+    setTechnologies([...tempTechnologies]);
+    setShowTechnologiesDialog(false);
+    toast({
+      title: "Technologies updated",
+      description: "Your company's technologies have been updated successfully.",
+    });
+  };
+  
+  const handleAddTechnology = (tech: string) => {
+    if (tech.trim() && !tempTechnologies.includes(tech.trim())) {
+      setTempTechnologies([...tempTechnologies, tech.trim()]);
+    }
+  };
+  
+  const handleRemoveTechnology = (tech: string) => {
+    setTempTechnologies(tempTechnologies.filter(t => t !== tech));
+  };
+  
+  const handleOpenLegalDialog = () => {
+    setTempLegalInfo({...legalInfo});
+    setShowLegalDialog(true);
+  };
+  
+  const handleSaveLegalInfo = () => {
+    setLegalInfo({...tempLegalInfo});
+    setShowLegalDialog(false);
+    toast({
+      title: "Legal information updated",
+      description: "Your company's legal information has been updated successfully.",
+    });
+  };
+  
+  const handleOpenSocialMediaDialog = () => {
+    setTempSocialMedia({...socialMedia});
+    setShowSocialMediaDialog(true);
+  };
+  
+  const handleSaveSocialMedia = () => {
+    setSocialMedia({...tempSocialMedia});
+    setShowSocialMediaDialog(false);
+    toast({
+      title: "Social media updated",
+      description: "Your company's social media preferences have been updated successfully.",
+    });
+  };
+  
+  const handleSocialMediaToggle = (platform: keyof typeof tempSocialMedia) => {
+    setTempSocialMedia({
+      ...tempSocialMedia,
+      [platform]: {
+        ...tempSocialMedia[platform],
+        active: !tempSocialMedia[platform].active
+      }
+    });
+  };
+
+  const handleSocialMediaUrlChange = (platform: keyof typeof tempSocialMedia, url: string) => {
+    setTempSocialMedia({
+      ...tempSocialMedia,
+      [platform]: {
+        ...tempSocialMedia[platform],
+        url
+      }
+    });
+  };
+
+  useEffect(() => {
+    document.title = `${company.name} | StageConnect`;
+  }, [company.name]);
+
+  const handleAddPost = (newPost: Post) => {
+    setPosts([newPost, ...posts]);
+  };
+  
+  const handleProfileUpdate = () => {
+    setCompany(tempCompany);
+    setContactInfo(tempContactInfo);
+    setIsEditing(false);
+    toast({
+      title: "Profile updated",
+      description: "Your company profile has been updated successfully.",
+    });
+  };
+
+  const handleStartEditing = () => {
+    setTempCompany({...company});
+    setTempContactInfo({...contactInfo});
+    setIsEditing(true);
+  };
+
+  const handleCancelEditing = () => {
+    setTempCompany({...company});
+    setTempContactInfo({...contactInfo});
+    setIsEditing(false);
+  };
+
+  // Add internship handling functions
+  const handleAddInternship = () => {
+    setInternshipForm({
+      title: "",
+      department: "",
+      location: "",
+      workType: "on-site",
+      duration: "",
+      compensation: "",
+      deadline: ""
+    });
+    setCurrentInternship(null);
+    setShowInternshipDialog(true);
+  };
+
+  const handleEditInternship = (internship: Internship) => {
+    setCurrentInternship(internship);
+    setInternshipForm({
+      title: internship.title,
+      department: internship.department,
+      location: internship.location,
+      workType: internship.workType,
+      duration: internship.duration,
+      compensation: internship.compensation,
+      deadline: new Date(internship.deadline).toISOString().split('T')[0]
+    });
+    setShowInternshipDialog(true);
+  };
+
+  const handleSaveInternship = () => {
+    if (!internshipForm.title || !internshipForm.department) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (currentInternship) {
+      // Update existing internship
+      const updatedInternships = internships.map(internship => 
+        internship.id === currentInternship.id 
+          ? { 
+              ...internship, 
+              ...internshipForm,
+              deadline: internshipForm.deadline 
+                ? new Date(internshipForm.deadline).toISOString() 
+                : internship.deadline
+            } 
+          : internship
+      );
+      setInternships(updatedInternships);
+      toast({
+        title: "Internship updated",
+        description: `${internshipForm.title} has been updated successfully.`,
+      });
+    } else {
+      // Add new internship
+      const newInternship = {
+        id: internships.length + 1,
+        ...internshipForm,
+        applicants: 0,
+        status: "active",
+        posted: new Date().toISOString(),
+        deadline: internshipForm.deadline 
+          ? new Date(internshipForm.deadline).toISOString() 
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+      setInternships([...internships, newInternship]);
+      toast({
+        title: "Internship created",
+        description: `${internshipForm.title} has been posted successfully.`,
+      });
+    }
+
+    setShowInternshipDialog(false);
+  };
+
+  const toggleInternshipStatus = (id: number) => {
+    const updatedInternships = internships.map(internship => {
+      if (internship.id === id) {
+        const newStatus = internship.status === "active" ? "closed" : "active";
+        return { ...internship, status: newStatus };
+      }
+      return internship;
+    });
+    
+    setInternships(updatedInternships);
+    
+    const internship = internships.find(int => int.id === id);
+    const newStatus = internship?.status === "active" ? "closed" : "active";
+    
+    toast({
+      title: `Internship ${newStatus}`,
+      description: `${internship?.title} is now ${newStatus}.`,
+    });
+  };
+
+  const handleInternshipInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setInternshipForm({
+      ...internshipForm,
+      [name]: value
+    });
+  };
+
+  const handleInternshipSelectChange = (name: string, value: string) => {
+    setInternshipForm({
+      ...internshipForm,
+      [name]: value
+    });
+  };
+
+  const handleOpenEditDialog = (type: "achievement" | "project" | "client" | "teamMember" | "insight", item: any) => {
+    setItemType(type);
+    setCurrentItem(item);
+    setItemForm({...item});
+    setShowItemDialog(true);
+  };
+
+  const handleAddItem = (type: "achievement" | "project" | "client" | "teamMember" | "insight") => {
+    setItemType(type);
+    setCurrentItem(null);
+    
+    // Initialize empty form based on type
+    switch(type) {
+      case "achievement":
+        setItemForm({ title: "", description: "", icon: "award" });
+        break;
+      case "project":
+        setItemForm({ title: "", description: "", tags: [] });
+        break;
+      case "client":
+        setItemForm({ name: "" });
+        break;
+      case "teamMember":
+        setItemForm({ name: "", role: "", bio: "", imageUrl: "" });
+        break;
+      case "insight":
+        setItemForm({ title: "", description: "", linkText: "" });
+        break;
+    }
+    
+    setShowItemDialog(true);
+  };
+
+  const handleSaveItem = () => {
+    if (!itemType) return;
+
+    // Validate form
+    if (!itemForm.title && itemType !== "client") {
+      toast({
+        title: "Missing information",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (itemType === "client" && !itemForm.name) {
+      toast({
+        title: "Missing information",
+        description: "Please enter a client name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Update or create new item based on type
+    if (currentItem) {
+      // Update existing item
+      switch(itemType) {
+        case "achievement":
+          setAchievements(achievements.map(item => 
+            item.id === currentItem.id ? { ...item, ...itemForm } : item
+          ));
+          break;
+        case "project":
+          setProjects(projects.map(item => 
+            item.id === currentItem.id ? { ...item, ...itemForm } : item
+          ));
+          break;
+        case "client":
+          setClients(clients.map(item => 
+            item.id === currentItem.id ? { ...item, ...itemForm } : item
+          ));
+          break;
+        case "teamMember":
+          setTeamMembers(teamMembers.map(item => 
+            item.id === currentItem.id ? { ...item, ...itemForm } : item
+          ));
+          break;
+        case "insight":
+          setInsights(insights.map(item => 
+            item.id === currentItem.id ? { ...item, ...itemForm } : item
+          ));
+          break;
+      }
+
+      toast({
+        title: "Item updated",
+        description: `The ${itemType} has been updated successfully.`,
+      });
+    } else {
+      // Create new item
+      const newId = Date.now();
+      switch(itemType) {
+        case "achievement":
+          setAchievements([...achievements, { ...itemForm, id: newId }]);
+          break;
+        case "project":
+          setProjects([...projects, { ...itemForm, id: newId }]);
+          break;
+        case "client":
+          setClients([...clients, { ...itemForm, id: newId }]);
+          break;
+        case "teamMember":
+          setTeamMembers([...teamMembers, { ...itemForm, id: newId }]);
+          break;
+        case "insight":
+          setInsights([...insights, { ...itemForm, id: newId }]);
+          break;
+      }
+
+      toast({
+        title: "Item added",
+        description: `A new ${itemType} has been added successfully.`,
+      });
+    }
+
+    setShowItemDialog(false);
+  };
+
+  const handleOpenDeleteDialog = (type: string, id: number) => {
+    setItemToDelete({ type, id });
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteItem = () => {
+    if (!itemToDelete) return;
+
+    // Delete item based on type
+    switch(itemToDelete.type) {
+      case "achievement":
+        setAchievements(achievements.filter(item => item.id !== itemToDelete.id));
+        break;
+      case "project":
+        setProjects(projects.filter(item => item.id !== itemToDelete.id));
+        break;
+      case "client":
+        setClients(clients.filter(item => item.id !== itemToDelete.id));
+        break;
+      case "teamMember":
+        setTeamMembers(teamMembers.filter(item => item.id !== itemToDelete.id));
+        break;
+      case "insight":
+        setInsights(insights.filter(item => item.id !== itemToDelete.id));
+        break;
+      case "internship":
+        setInternships(internships.filter(item => item.id !== itemToDelete.id));
+        break;
+      case "post":
+        setPosts(posts.filter(item => item.id !== itemToDelete.id));
+        break;
+    }
+
+    toast({
+      title: "Item deleted",
+      description: `The ${itemToDelete.type} has been deleted.`,
+    });
+
+    setShowDeleteDialog(false);
+    setItemToDelete(null);
+  };
+
+  const handleItemInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setItemForm({
+      ...itemForm,
+      [name]: value
+    });
+  };
+
+  const handleItemSelectChange = (name: string, value: string) => {
+    setItemForm({
+      ...itemForm,
+      [name]: value
+    });
+  };
+
+  const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const tagsString = e.target.value;
+    const tagsArray = tagsString.split(',').map(tag => tag.trim()).filter(tag => tag);
+    setItemForm({
+      ...itemForm,
+      tags: tagsArray
+    });
+  };
+
+  const DeleteConfirmDialog = () => (
+    <AlertDialog open={showDeleteDialog} onOpenChange={(open) => !open && setShowDeleteDialog(false)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently delete this {itemToDelete?.type}. This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDeleteItem} className="bg-red-600 hover:bg-red-700">
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
+  return (
+    <div className="container mx-auto px-4 py-6">
+      {isEditing ? (
+        <CompanyProfileEditForm 
+          tempCompany={tempCompany}
+          setTempCompany={setTempCompany}
+          tempContactInfo={tempContactInfo}
+          setTempContactInfo={setTempContactInfo}
+          handleCancelEditing={handleCancelEditing}
+          handleProfileUpdate={handleProfileUpdate}
+        />
+      ) : (
+        <>
+          {/* Profile Header */}
+          <Card className="mb-6 overflow-hidden">
+            <div className="h-40 bg-gradient-to-r from-blue-600 to-indigo-700"></div>
+            <CardContent className="relative">
+              <div className="absolute -top-16 left-4 md:left-8">
+                <Avatar className="h-32 w-32 border-4 border-white bg-white">
+                  <AvatarImage src={company.logo} alt={company.name} />
+                  <AvatarFallback><BuildingIcon className="h-16 w-16 text-blue-500" /></AvatarFallback>
+                </Avatar>
+              </div>
+              
+              <div className="pt-20 md:pt-16 md:ml-40 flex flex-col md:flex-row md:justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold">{company.name}</h1>
+                  <p className="text-neutral-600">{company.industry}</p>
+                  <div className="flex flex-col md:flex-row md:space-x-4 space-y-1 md:space-y-0 mt-2 text-sm text-neutral-500">
+                    <div className="flex items-center">
+                      <MapPinIcon className="h-4 w-4 mr-1" />
+                      <span>{company.location}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <MailIcon className="h-4 w-4 mr-1" />
+                      <span>{contactInfo.email}</span>
+                    </div>
+                    {company.website && (
+                      <div className="flex items-center">
+                        <GlobeIcon className="h-4 w-4 mr-1" />
+                        <a href={`https://${company.website}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                          {company.website}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-4 md:mt-0">
+                  <Button onClick={handleStartEditing}>
+                    <PenIcon className="h-4 w-4 mr-2" /> Edit Profile
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Main Content Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-6">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="posts">Posts</TabsTrigger>
+              <TabsTrigger value="internships">Internships</TabsTrigger>
+              <TabsTrigger value="about">About</TabsTrigger>
+            </TabsList>
+            
+            {/* Overview Tab - Will be expanded */}
+            <TabsContent value="overview">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-2 space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Company Overview</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-neutral-700">{company.description}</p>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Key Achievements</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {achievements.map((achievement) => (
+                          <div key={achievement.id} className="flex gap-4 items-start group">
+                            <div className="bg-primary/10 p-2 rounded-full">
+                              {achievement.icon === "award" && <AwardIcon className="h-6 w-6 text-primary" />}
+                              {achievement.icon === "trophy" && <TrophyIcon className="h-6 w-6 text-primary" />}
+                              {achievement.icon === "chart" && <BarChartIcon className="h-6 w-6 text-primary" />}
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-medium">{achievement.title}</h3>
+                              <p className="text-neutral-600 text-sm">{achievement.description}</p>
+                            </div>
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => handleOpenEditDialog("achievement", achievement)}
+                              >
+                                <PenIcon className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => handleOpenDeleteDialog("achievement", achievement.id)}
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                        <Button 
+                          variant="outline" 
+                          className="w-full mt-2" 
+                          onClick={() => handleAddItem("achievement")}
+                        >
+                          <PlusIcon className="h-4 w-4 mr-2" />
+                          Add Achievement
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>Featured Projects</CardTitle>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleAddItem("project")}
+                      >
+                        <PlusIcon className="h-4 w-4 mr-2" />
+                        Add Project
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {projects.map((project) => (
+                          <div key={project.id} className="border rounded-lg p-4 group relative">
+                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded p-1">
+                              <Button
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => handleOpenEditDialog("project", project)}
+                              >
+                                <PenIcon className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => handleOpenDeleteDialog("project", project.id)}
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <h3 className="font-medium">{project.title}</h3>
+                            <p className="text-neutral-600 text-sm mt-1">{project.description}</p>
+                            <div className="flex gap-2 mt-2">
+                              {project.tags.map((tag, index) => (
+                                <Badge key={index} variant="outline">{tag}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Recent Posts</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {posts.slice(0, 2).map((post) => (
+                        <PostCard key={post.id} post={post} />
+                      ))}
+                      {posts.length === 0 && (
+                        <p className="text-neutral-500 text-center">No posts to display</p>
+                      )}
+                      <Button variant="outline" className="w-full" onClick={() => setActiveTab("posts")}>
+                        View All Updates
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Company Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Industry</h3>
+                        <p>{company.industry}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Company size</h3>
+                        <p>{company.size} employees</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Founded</h3>
+                        <p>{company.founded}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Website</h3>
+                        <a 
+                          href={`https://${company.website}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-primary hover:underline"
+                        >
+                          {company.website}
+                        </a>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Contact Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Email</h3>
+                        <p>{contactInfo.email}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Phone</h3>
+                        <p>{contactInfo.phone}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Address</h3>
+                        <p>{contactInfo.address}, {contactInfo.city}, {contactInfo.postalCode}</p>
+                        <p>{contactInfo.country}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Open Positions</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Currently hiring for {internships.filter(i => i.status === "active").length} positions</p>
+                        <Button variant="outline" className="w-full" onClick={() => setActiveTab("internships")}>
+                          <BriefcaseIcon className="h-4 w-4 mr-2" />
+                          View Open Positions
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>Our Clients</CardTitle>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleAddItem("client")}
+                      >
+                        <PlusIcon className="h-4 w-4" />
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-4">
+                        {clients.map((client) => (
+                          <div key={client.id} className="border rounded-md flex items-center justify-center p-4 h-20 group relative">
+                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded p-1">
+                              <Button
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => handleOpenEditDialog("client", client)}
+                              >
+                                <PenIcon className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => handleOpenDeleteDialog("client", client.id)}
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <p className="font-medium text-center">{client.name}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Posts Tab - Will be expanded */}
+            <TabsContent value="posts">
+              <div className="space-y-4">
+                <CreatePost onAddPost={handleAddPost} />
+                {posts.map((post) => (
+                  <PostCard key={post.id} post={post} />
+                ))}
+                {posts.length === 0 && (
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <p className="text-neutral-500">You haven't posted anything yet. Share your first company update!</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Internships Tab - Will be expanded */}
+            <TabsContent value="internships">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Internship Opportunities</CardTitle>
+                    <CardDescription>Manage and showcase your current internship positions</CardDescription>
+                  </div>
+                  <Button onClick={handleAddInternship}>
+                    <PlusIcon className="h-4 w-4 mr-2" />
+                    Add New Internship
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {internships.length === 0 ? (
+                      <div className="text-center py-10">
+                        <BriefcaseIcon className="mx-auto h-10 w-10 text-neutral-300 mb-4" />
+                        <h3 className="text-lg font-medium mb-2">No internships posted yet</h3>
+                        <p className="text-neutral-500 mb-4">Create your first internship listing to start attracting candidates.</p>
+                        <Button onClick={handleAddInternship}>
+                          <PlusIcon className="h-4 w-4 mr-2" />
+                          Create New Listing
+                        </Button>
+                      </div>
+                    ) : (
+                      internships.map((internship) => (
+                        <div key={internship.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-neutral-50">
+                          <div>
+                            <h3 className="font-medium">{internship.title}</h3>
+                            <div className="flex items-center text-sm text-neutral-500 mt-1">
+                              <span>{internship.department}</span>
+                              <span className="mx-2">•</span>
+                              <span>{internship.location}</span>
+                              <span className="mx-2">•</span>
+                              <span>
+                                Deadline: {new Date(internship.deadline).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-center">
+                              <div className="font-semibold">{internship.applicants}</div>
+                              <div className="text-xs text-neutral-500">Applicants</div>
+                            </div>
+                            <Badge variant={internship.status === "active" ? "default" : "secondary"}>
+                              {internship.status === "active" ? "Active" : "Closed"}
+                            </Badge>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="icon" onClick={() => handleEditInternship(internship)}>
+                                <PenIcon className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => toggleInternshipStatus(internship.id)}>
+                                {internship.status === "active" ? (
+                                  <XIcon className="h-4 w-4" />
+                                ) : (
+                                  <CheckIcon className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Stats and Metrics */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-neutral-500">
+                      Total Applications
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="text-2xl font-bold">
+                        {internships.reduce((total, internship) => total + internship.applicants, 0)}
+                      </div>
+                      <div className="p-2 bg-primary/10 rounded-full">
+                        <UsersIcon className="text-primary h-5 w-5" />
+                      </div>
+                    </div>
+                    <div className="text-xs text-neutral-500 mt-1">
+                      Across all internship positions
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-neutral-500">
+                      Active Positions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="text-2xl font-bold">
+                        {internships.filter(i => i.status === "active").length}
+                      </div>
+                      <div className="p-2 bg-primary/10 rounded-full">
+                        <BriefcaseIcon className="text-primary h-5 w-5" />
+                      </div>
+                    </div>
+                    <div className="text-xs text-neutral-500 mt-1">
+                      Currently accepting applications
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-neutral-500">
+                      Upcoming Deadlines
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="text-2xl font-bold">
+                        {internships.filter(i => 
+                          i.status === "active" && 
+                          new Date(i.deadline).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000
+                        ).length}
+                      </div>
+                      <div className="p-2 bg-primary/10 rounded-full">
+                        <ClockIcon className="text-primary h-5 w-5" />
+                      </div>
+                    </div>
+                    <div className="text-xs text-neutral-500 mt-1">
+                      Closing in the next 7 days
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* About Tab - Will be expanded */}
+            <TabsContent value="about">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-2 space-y-6">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>About {company.name}</CardTitle>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleOpenAboutDialog}
+                      >
+                        <PenIcon className="h-4 w-4 mr-2" />
+                        Edit About
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <p className="text-neutral-700">{company.description}</p>
+                        
+                        <div>
+                          <h3 className="font-medium text-lg mb-2">Our Mission</h3>
+                          <p className="text-neutral-700">
+                            {tempAboutInfo.mission}
+                          </p>
+                        </div>
+                        
+                        <div>
+                          <h3 className="font-medium text-lg mb-2">Company History</h3>
+                          <p className="text-neutral-700">
+                            {tempAboutInfo.history}
+                          </p>
+                        </div>
+                        
+                        <div>
+                          <h3 className="font-medium text-lg mb-2">Our Values</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                            <div className="bg-muted/30 p-4 rounded-md">
+                              <h4 className="font-medium">Excellence</h4>
+                              <p className="text-sm text-neutral-600 mt-1">We deliver products and services of the highest quality, continuously pushing the boundaries of what's possible.</p>
+                            </div>
+                            <div className="bg-muted/30 p-4 rounded-md">
+                              <h4 className="font-medium">Innovation</h4>
+                              <p className="text-sm text-neutral-600 mt-1">We embrace new technologies and ideas, fostering a culture of continuous improvement and creative problem-solving.</p>
+                            </div>
+                            <div className="bg-muted/30 p-4 rounded-md">
+                              <h4 className="font-medium">Integrity</h4>
+                              <p className="text-sm text-neutral-600 mt-1">We conduct business ethically and transparently, building trust with our clients, partners, and employees.</p>
+                            </div>
+                            <div className="bg-muted/30 p-4 rounded-md">
+                              <h4 className="font-medium">Collaboration</h4>
+                              <p className="text-sm text-neutral-600 mt-1">We believe in the power of teamwork and partnership, both internally and with our clients, to achieve exceptional results.</p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <h3 className="font-medium text-lg mb-2">Corporate Responsibility</h3>
+                          <p className="text-neutral-700">
+                            {tempAboutInfo.responsibility}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>Technologies We Use</CardTitle>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleOpenTechnologiesDialog}
+                      >
+                        <PenIcon className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {technologies.map((tech) => (
+                          <div key={tech} className="bg-neutral-100 p-2 rounded-md text-center">
+                            {tech}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>Industry Insights</CardTitle>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleAddItem("insight")}
+                      >
+                        <PlusIcon className="h-4 w-4 mr-2" />
+                        Add Insight
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {insights.map((insight) => (
+                          <div key={insight.id} className="border p-4 rounded-lg group relative">
+                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded p-1">
+                              <Button
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => handleOpenEditDialog("insight", insight)}
+                              >
+                                <PenIcon className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => handleOpenDeleteDialog("insight", insight.id)}
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <h3 className="font-medium">{insight.title}</h3>
+                            <p className="text-sm text-neutral-600 mt-1">{insight.description}</p>
+                            <Button variant="link" className="px-0 h-8 mt-1">{insight.linkText}</Button>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>Company Information</CardTitle>
+                      <Button
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={handleStartEditing}
+                      >
+                        <PenIcon className="h-4 w-4" />
+                      </Button>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Industry</h3>
+                        <p>{company.industry}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Company size</h3>
+                        <p>{company.size} employees</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Founded</h3>
+                        <p>{company.founded}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Website</h3>
+                        <a 
+                          href={`https://${company.website}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-primary hover:underline"
+                        >
+                          {company.website}
+                        </a>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Headquarters</h3>
+                        <p>{company.location}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>Contact Information</CardTitle>
+                      <Button
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={handleStartEditing}
+                      >
+                        <PenIcon className="h-4 w-4" />
+                      </Button>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Email</h3>
+                        <p>{contactInfo.email}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Phone</h3>
+                        <p>{contactInfo.phone}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Address</h3>
+                        <p>{contactInfo.address}, {contactInfo.city}, {contactInfo.postalCode}</p>
+                        <p>{contactInfo.country}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>Social Media</CardTitle>
+                      <Button
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={handleOpenSocialMediaDialog}
+                      >
+                        <PenIcon className="h-4 w-4" />
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex gap-2">
+                        {socialMedia.linkedin.active && (
+                          <a 
+                            href={socialMedia.linkedin.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="outline" size="icon">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                                <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+                                <rect x="2" y="9" width="4" height="12"></rect>
+                                <circle cx="4" cy="4" r="2"></circle>
+                              </svg>
+                            </Button>
+                          </a>
+                        )}
+                        {socialMedia.twitter.active && (
+                          <a 
+                            href={socialMedia.twitter.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="outline" size="icon">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                                <path d="M22 4.01c-1 .49-1.98.689-3 .99-1.121-2.783-2.783-4.38-.737S11.977 6.323 12 8v1c-3.245.083-6.135-1.395-8-4 0 0-4.182 7.433 4 11-1.872 1.247-3.739 2.088-6 2 3.308 1.803 6.913 2.423 10.034 1.517 3.58-1.04 6.522-3.723 7.651-7.742a13.84 13.84 0 0 0 .497-3.753C20.18 7.773 21.692 5.25 22 4.009z"></path>
+                              </svg>
+                            </Button>
+                          </a>
+                        )}
+                        {socialMedia.instagram.active && (
+                          <a 
+                            href={socialMedia.instagram.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="outline" size="icon">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                              </svg>
+                            </Button>
+                          </a>
+                        )}
+                        {socialMedia.facebook.active && (
+                          <a 
+                            href={socialMedia.facebook.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="outline" size="icon">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                                <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+                              </svg>
+                            </Button>
+                          </a>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>Legal Information</CardTitle>
+                      <Button
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={handleOpenLegalDialog}
+                      >
+                        <PenIcon className="h-4 w-4" />
+                      </Button>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Registration Number</h3>
+                        <p className="text-sm">{legalInfo.registrationNumber}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">VAT ID</h3>
+                        <p className="text-sm">{legalInfo.vatId}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-500">Legal Form</h3>
+                        <p className="text-sm">{legalInfo.legalForm}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
+
+      {/* Internship Form Dialog */}
+      <Dialog open={showInternshipDialog} onOpenChange={setShowInternshipDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>
+              {currentInternship ? "Edit Internship" : "Create New Internship"}
+            </DialogTitle>
+            <DialogDescription>
+              {currentInternship
+                ? "Make changes to your existing internship listing"
+                : "Fill in the details to create a new internship opportunity"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">Job Title <span className="text-red-500">*</span></Label>
+                <Input 
+                  id="title" 
+                  name="title" 
+                  value={internshipForm.title} 
+                  onChange={handleInternshipInputChange} 
+                  placeholder="e.g., UX/UI Design Intern"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="department">Department <span className="text-red-500">*</span></Label>
+                <Input 
+                  id="department" 
+                  name="department" 
+                  value={internshipForm.department} 
+                  onChange={handleInternshipInputChange} 
+                  placeholder="e.g., Design, Engineering, Marketing"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="location">Location <span className="text-red-500">*</span></Label>
+                <Input 
+                  id="location" 
+                  name="location" 
+                  value={internshipForm.location} 
+                  onChange={handleInternshipInputChange} 
+                  placeholder="e.g., Paris, France"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="workType">Work Type</Label>
+                <Select 
+                  value={internshipForm.workType} 
+                  onValueChange={(value) => handleInternshipSelectChange("workType", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="on-site">On-site</SelectItem>
+                    <SelectItem value="remote">Remote</SelectItem>
+                    <SelectItem value="hybrid">Hybrid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="duration">Duration</Label>
+                <Input 
+                  id="duration" 
+                  name="duration" 
+                  value={internshipForm.duration} 
+                  onChange={handleInternshipInputChange} 
+                  placeholder="e.g., 3 months, 6 months"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="compensation">Compensation</Label>
+                <Input 
+                  id="compensation" 
+                  name="compensation" 
+                  value={internshipForm.compensation} 
+                  onChange={handleInternshipInputChange} 
+                  placeholder="e.g., €800/month"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="deadline">Application Deadline</Label>
+              <Input 
+                id="deadline" 
+                name="deadline" 
+                type="date" 
+                value={internshipForm.deadline} 
+                onChange={handleInternshipInputChange}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInternshipDialog(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" onClick={handleSaveInternship}>
+              {currentInternship ? "Save Changes" : "Create Internship"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Item Dialog */}
+      <EditItemDialog 
+        showItemDialog={showItemDialog}
+        setShowItemDialog={setShowItemDialog}
+        itemType={itemType}
+        currentItem={currentItem}
+        itemForm={itemForm}
+        handleItemInputChange={handleItemInputChange}
+        handleItemSelectChange={handleItemSelectChange}
+        handleTagsChange={handleTagsChange}
+        handleSaveItem={handleSaveItem}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmDialog />
+
+      {/* About Information Dialog */}
+      <Dialog open={showAboutDialog} onOpenChange={setShowAboutDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit About Information</DialogTitle>
+            <DialogDescription>
+              Update your company's about information below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="mission">Our Mission</Label>
+              <Textarea 
+                id="mission" 
+                value={tempAboutInfo.mission}
+                onChange={(e) => setTempAboutInfo({...tempAboutInfo, mission: e.target.value})}
+                rows={4}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="history">Company History</Label>
+              <Textarea 
+                id="history" 
+                value={tempAboutInfo.history}
+                onChange={(e) => setTempAboutInfo({...tempAboutInfo, history: e.target.value})}
+                rows={4}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="responsibility">Corporate Responsibility</Label>
+              <Textarea 
+                id="responsibility" 
+                value={tempAboutInfo.responsibility}
+                onChange={(e) => setTempAboutInfo({...tempAboutInfo, responsibility: e.target.value})}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAboutDialog(false)}>Cancel</Button>
+            <Button onClick={handleSaveAboutInfo}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Technologies Dialog */}
+      <Dialog open={showTechnologiesDialog} onOpenChange={setShowTechnologiesDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Technologies</DialogTitle>
+            <DialogDescription>
+              Add or remove technologies your company uses.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-wrap gap-2">
+              {tempTechnologies.map((tech) => (
+                <div key={tech} className="bg-neutral-100 rounded-md px-3 py-1 flex items-center">
+                  {tech}
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6 ml-1" 
+                    onClick={() => handleRemoveTechnology(tech)}
+                  >
+                    <XIcon className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input 
+                id="newTech" 
+                placeholder="Add new technology..." 
+                className="flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddTechnology((e.target as HTMLInputElement).value);
+                    (e.target as HTMLInputElement).value = '';
+                  }
+                }}
+              />
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  const input = document.getElementById('newTech') as HTMLInputElement;
+                  handleAddTechnology(input.value);
+                  input.value = '';
+                }}
+              >
+                Add
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTechnologiesDialog(false)}>Cancel</Button>
+            <Button onClick={handleSaveTechnologies}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Legal Information Dialog */}
+      <Dialog open={showLegalDialog} onOpenChange={setShowLegalDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Legal Information</DialogTitle>
+            <DialogDescription>
+              Update your company's legal details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="registrationNumber">Registration Number</Label>
+              <Input 
+                id="registrationNumber" 
+                value={tempLegalInfo.registrationNumber}
+                onChange={(e) => setTempLegalInfo({...tempLegalInfo, registrationNumber: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="vatId">VAT ID</Label>
+              <Input 
+                id="vatId" 
+                value={tempLegalInfo.vatId}
+                onChange={(e) => setTempLegalInfo({...tempLegalInfo, vatId: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="legalForm">Legal Form</Label>
+              <Input 
+                id="legalForm" 
+                value={tempLegalInfo.legalForm}
+                onChange={(e) => setTempLegalInfo({...tempLegalInfo, legalForm: e.target.value})}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLegalDialog(false)}>Cancel</Button>
+            <Button onClick={handleSaveLegalInfo}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Social Media Dialog */}
+      <Dialog open={showSocialMediaDialog} onOpenChange={setShowSocialMediaDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Social Media</DialogTitle>
+            <DialogDescription>
+              Manage your company's social media presence.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    id="linkedin" 
+                    checked={tempSocialMedia.linkedin.active}
+                    onChange={() => handleSocialMediaToggle('linkedin')}
+                  />
+                  <Label htmlFor="linkedin">LinkedIn</Label>
+                </div>
+                <Input 
+                  id="linkedinUrl" 
+                  value={tempSocialMedia.linkedin.url}
+                  onChange={(e) => handleSocialMediaUrlChange('linkedin', e.target.value)}
+                  placeholder="https://linkedin.com/company/yourcompany"
+                  disabled={!tempSocialMedia.linkedin.active}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    id="twitter" 
+                    checked={tempSocialMedia.twitter.active}
+                    onChange={() => handleSocialMediaToggle('twitter')}
+                  />
+                  <Label htmlFor="twitter">Twitter</Label>
+                </div>
+                <Input 
+                  id="twitterUrl" 
+                  value={tempSocialMedia.twitter.url}
+                  onChange={(e) => handleSocialMediaUrlChange('twitter', e.target.value)}
+                  placeholder="https://twitter.com/yourcompany"
+                  disabled={!tempSocialMedia.twitter.active}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    id="instagram" 
+                    checked={tempSocialMedia.instagram.active}
+                    onChange={() => handleSocialMediaToggle('instagram')}
+                  />
+                  <Label htmlFor="instagram">Instagram</Label>
+                </div>
+                <Input 
+                  id="instagramUrl" 
+                  value={tempSocialMedia.instagram.url}
+                  onChange={(e) => handleSocialMediaUrlChange('instagram', e.target.value)}
+                  placeholder="https://instagram.com/yourcompany"
+                  disabled={!tempSocialMedia.instagram.active}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    id="facebook" 
+                    checked={tempSocialMedia.facebook.active}
+                    onChange={() => handleSocialMediaToggle('facebook')}
+                  />
+                  <Label htmlFor="facebook">Facebook</Label>
+                </div>
+                <Input 
+                  id="facebookUrl" 
+                  value={tempSocialMedia.facebook.url}
+                  onChange={(e) => handleSocialMediaUrlChange('facebook', e.target.value)}
+                  placeholder="https://facebook.com/yourcompany"
+                  disabled={!tempSocialMedia.facebook.active}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSocialMediaDialog(false)}>Cancel</Button>
+            <Button onClick={handleSaveSocialMedia}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default EmployerProfile; 

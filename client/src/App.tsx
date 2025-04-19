@@ -19,6 +19,7 @@ import Footer from "@/components/layout/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import EmployerProfile from "./pages/EmployerProfile";
 
 function App() {
   return (
@@ -50,7 +51,7 @@ function AppContent() {
             <>
               {/* Common routes for all users */}
               <Route path="/messaging" component={Messaging} />
-              <Route path="/profile" component={Profile} />
+              {/* <Route path="/profile" component={Profile} /> */}
               
               {/* Role-specific home routes */}
               <Route path="/">
@@ -69,6 +70,7 @@ function AppContent() {
                   <Route path="/internships/:id" component={InternshipDetail} />
                   <Route path="/network" component={Network} />
                   <Route path="/cv-builder" component={CVBuilder} />
+                  <Route path="/profile" component={Profile} />
                 </>
               )}
               
@@ -76,6 +78,7 @@ function AppContent() {
               {(user?.role === "employer" || user?.role === "supervisor") && (
                 <>
                   <Route path="/employer-dashboard" component={EmployerDashboard} />
+                  <Route path="/profile" component={EmployerProfile} />
                 </>
               )}
               
