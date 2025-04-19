@@ -52,11 +52,49 @@ import {
   MapPinIcon,
   ClockIcon,
   CreditCardIcon,
-  BuildingIcon
+  BuildingIcon,
+  SearchIcon,
+  FilterIcon,
+  ChevronDownIcon,
+  PieChartIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+// Define application type
+type Application = {
+  id: string;
+  internshipId: string;
+  internshipTitle: string;
+  applicantName: string;
+  applicantPhoto: string;
+  university: string;
+  email: string;
+  phone: string;
+  portfolio?: string;
+  skills: string[];
+  coverLetter: string;
+  status: "pending" | "interview" | "accepted" | "rejected";
+  appliedAt: string;
+  interviewDate?: string;
+  interviewTime?: string;
+};
+
+// Function to format relative time
+function formatRelativeTime(dateString: string) {
+  return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+}
+
+// Company info
+const companyInfo = {
+  name: "TechCorp Solutions",
+  logo: "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&h=200&q=80",
+  activeInternships: 3,
+  totalPositions: 8
+};
 
 export default function EmployerDashboard() {
   const { user } = useAuth();
@@ -70,12 +108,12 @@ export default function EmployerDashboard() {
   
   // Applicant management state
   const [showApplicantView, setShowApplicantView] = useState(false);
-  const [currentApplicant, setCurrentApplicant] = useState<any>(null);
+  const [currentApplicant, setCurrentApplicant] = useState<Application | null>(null);
   const [applicantNotes, setApplicantNotes] = useState("");
   const [interviewDate, setInterviewDate] = useState("");
   const [interviewTime, setInterviewTime] = useState("");
   const [feedbackRating, setFeedbackRating] = useState<number>(0);
-  const [applicantStatusFilter, setApplicantStatusFilter] = useState("all");
+  const [applicantStatusFilter, setApplicantStatusFilter] = useState<string>("all");
   
   // Form state
   const [internshipForm, setInternshipForm] = useState({
@@ -102,159 +140,84 @@ export default function EmployerDashboard() {
     interviewingApplications: 6
   };
 
-  // Define application type
-  type Application = {
-    id: number;
-    internshipId: number;
-    internshipTitle: string;
-    applicantName: string;
-    applicantPhoto: string;
-    university: string;
-    email: string;
-    phone: string;
-    coverLetter: string;
-    skills: string[];
-    portfolio: string;
-    status: string;
-    interviewDate: string | null;
-    interviewTime: string | null;
-    feedback: string;
-    rating: number;
-    notes: string;
-    appliedAt: string;
-  };
-
   // Static recent applications with expanded data
   const [applications, setApplications] = useState<Application[]>([
     {
-      id: 1,
-      internshipId: 1,
-      internshipTitle: "UX/UI Design Intern",
-      applicantName: "Emma Davis",
-      applicantPhoto: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=120&q=80",
-      university: "Paris Design Academy",
-      email: "emma.davis@example.com",
-      phone: "+33 6 12 34 56 78",
-      coverLetter: "I am excited to apply for the UX/UI Design Intern position at your company. As a design student at Paris Design Academy, I have developed strong skills in user-centered design principles and have experience with industry standard tools like Figma and Adobe XD.",
-      skills: ["Figma", "Adobe XD", "UI Design", "Wireframing", "Prototyping"],
-      portfolio: "https://emmadavis-portfolio.example.com",
+      id: "app1",
+      internshipId: "int1",
+      internshipTitle: "Frontend Developer Intern",
+      applicantName: "Sarah Johnson",
+      applicantPhoto: "https://randomuser.me/api/portraits/women/44.jpg",
+      university: "Stanford University",
+      email: "sarah.j@stanford.edu",
+      phone: "+1 555-123-4567",
+      portfolio: "https://sarahjohnson.dev",
+      skills: ["React", "TypeScript", "UI/UX", "Figma"],
+      coverLetter: "I am excited to apply for the Frontend Developer Internship. With my background in React and TypeScript, I believe I can contribute significantly to your team while gaining valuable industry experience.",
+      status: "interview",
+      appliedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      interviewDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+      interviewTime: "14:00",
+    },
+    {
+      id: "app2",
+      internshipId: "int2",
+      internshipTitle: "Data Science Intern",
+      applicantName: "Michael Chen",
+      applicantPhoto: "https://randomuser.me/api/portraits/men/22.jpg",
+      university: "MIT",
+      email: "mchen@mit.edu",
+      phone: "+1 555-987-6543",
+      skills: ["Python", "Data Analysis", "Machine Learning", "SQL"],
+      coverLetter: "I am writing to express my interest in the Data Science Internship position. My strong foundation in statistical analysis and machine learning, combined with my passion for solving complex problems, makes me a suitable candidate for this role.",
       status: "pending",
-      interviewDate: null,
-      interviewTime: null,
-      feedback: "",
-      rating: 0,
-      notes: "",
       appliedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
     },
     {
-      id: 2,
-      internshipId: 2,
+      id: "app3",
+      internshipId: "int1",
       internshipTitle: "Frontend Developer Intern",
-      applicantName: "Alex Johnson",
-      applicantPhoto: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&auto=format&fit=crop&w=120&q=80",
-      university: "Lyon Tech Institute",
-      email: "alex.johnson@example.com",
-      phone: "+33 6 87 65 43 21",
-      coverLetter: "I am writing to express my interest in the Frontend Developer Intern position. I am currently studying Computer Science at Lyon Tech Institute and have been building web applications using React and Next.js for the past two years.",
-      skills: ["JavaScript", "React", "HTML", "CSS", "TypeScript"],
-      portfolio: "https://ajohnson-dev.example.com",
-      status: "interview",
-      interviewDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      interviewTime: "14:30",
-      feedback: "",
-      rating: 0,
-      notes: "Strong React skills, needs to work on TypeScript. Scheduled for first interview.",
-      appliedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 3,
-      internshipId: 3,
-      internshipTitle: "Marketing Intern",
-      applicantName: "Sophia Chen",
-      applicantPhoto: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-1.2.1&auto=format&fit=crop&w=120&q=80",
-      university: "Paris Business School",
-      email: "sophia.chen@example.com",
-      phone: "+33 6 23 45 67 89",
-      coverLetter: "With my background in digital marketing and analytics, I believe I am an excellent candidate for the Marketing Intern position. At Paris Business School, I have specialized in data-driven marketing strategies and have completed several projects analyzing campaign performance.",
-      skills: ["Social Media Marketing", "Google Analytics", "Content Creation", "SEO", "Data Analysis"],
-      portfolio: "https://sophiachen-marketing.example.com",
+      applicantName: "Emma Wilson",
+      applicantPhoto: "https://randomuser.me/api/portraits/women/63.jpg",
+      university: "UC Berkeley",
+      email: "emma.w@berkeley.edu",
+      phone: "+1 555-345-6789",
+      portfolio: "https://emmawilson.io",
+      skills: ["JavaScript", "React", "CSS", "Web Design"],
+      coverLetter: "I'm applying for the Frontend Developer Internship at your company. With my passion for creating beautiful and functional user interfaces, I am eager to contribute to your team's projects and grow my skills in a professional environment.",
       status: "accepted",
-      interviewDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      interviewTime: "10:15",
-      feedback: "Sophia demonstrated excellent analytical skills and had innovative ideas for improving our marketing campaigns. Her experience with Google Analytics will be particularly valuable.",
-      rating: 5,
-      notes: "Excellent candidate. Great cultural fit. Accepting with immediate start.",
       appliedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
     },
     {
-      id: 4,
-      internshipId: 1,
-      internshipTitle: "UX/UI Design Intern",
-      applicantName: "Thomas Martin",
-      applicantPhoto: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=crop&w=120&q=80", 
-      university: "Digital Arts College",
-      email: "thomas.martin@example.com",
-      phone: "+33 6 98 76 54 32",
-      coverLetter: "I am interested in the UX/UI Design Intern position as I am looking to apply my design education in a professional setting. I have completed several UX projects during my studies and am familiar with the design thinking process.",
-      skills: ["UI Design", "Sketch", "Adobe Photoshop", "Illustrator"],
-      portfolio: "https://tmartin-design.example.com",
+      id: "app4",
+      internshipId: "int3",
+      internshipTitle: "UX Research Intern",
+      applicantName: "David Kim",
+      applicantPhoto: "https://randomuser.me/api/portraits/men/36.jpg",
+      university: "Rhode Island School of Design",
+      email: "david.k@risd.edu",
+      phone: "+1 555-234-5678",
+      portfolio: "https://davidkim.design",
+      skills: ["User Research", "Prototyping", "Usability Testing", "Sketch"],
+      coverLetter: "I am interested in the UX Research Internship position at your company. My background in design thinking and user-centered research methods has prepared me to make meaningful contributions to your projects.",
       status: "rejected",
-      interviewDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      interviewTime: "11:00",
-      feedback: "Thomas has good theoretical knowledge but lacks practical experience with modern design tools like Figma. Portfolio showed limited UX understanding.",
-      rating: 2,
-      notes: "Not a good fit at this time. Consider for future opportunities after more experience.",
-      appliedAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
+      appliedAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
     },
     {
-      id: 5,
-      internshipId: 2,
-      internshipTitle: "Frontend Developer Intern",
-      applicantName: "Julie Bernard",
-      applicantPhoto: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?ixlib=rb-1.2.1&auto=format&fit=crop&w=120&q=80",
-      university: "Computer Science Institute",
-      email: "julie.bernard@example.com",
-      phone: "+33 6 45 67 89 01",
-      coverLetter: "As a computer science student with a passion for web development, I am excited about the Frontend Developer Intern role. I have completed several projects using React and am eager to apply my skills in a professional environment.",
-      skills: ["JavaScript", "React", "CSS", "Git", "Node.js"],
-      portfolio: "https://juliebernard-dev.example.com",
-      status: "interview",
-      interviewDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      interviewTime: "16:00",
-      feedback: "",
-      rating: 0,
-      notes: "Impressive portfolio. Second round interview scheduled.",
-      appliedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 6,
-      internshipId: 3,
-      internshipTitle: "Marketing Intern",
-      applicantName: "David Rousseau",
-      applicantPhoto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=crop&w=120&q=80",
-      university: "Marketing Academy",
-      email: "david.rousseau@example.com",
-      phone: "+33 6 78 90 12 34",
-      coverLetter: "I am writing to apply for the Marketing Intern position. My coursework at Marketing Academy has given me a strong foundation in marketing principles, and I have practical experience managing social media campaigns for student organizations.",
-      skills: ["Content Marketing", "Social Media", "Email Campaigns", "Market Research"],
-      portfolio: "",
+      id: "app5",
+      internshipId: "int2",
+      internshipTitle: "Data Science Intern",
+      applicantName: "Olivia Martinez",
+      applicantPhoto: "https://randomuser.me/api/portraits/women/25.jpg",
+      university: "Georgia Tech",
+      email: "o.martinez@gatech.edu",
+      phone: "+1 555-876-5432",
+      skills: ["R", "Statistics", "Data Visualization", "Big Data"],
+      coverLetter: "I am reaching out to express my enthusiasm for the Data Science Internship position. My academic background and practical experience in statistical analysis and data modeling align well with the requirements of this role.",
       status: "pending",
-      interviewDate: null,
-      interviewTime: null,
-      feedback: "",
-      rating: 0,
-      notes: "",
-      appliedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-    }
-  ].map((app) => ({
-    ...app,
-    interviewDate: app.interviewDate || null,
-    interviewTime: app.interviewTime || null,
-    portfolio: app.portfolio || "",
-    feedback: app.feedback || "",
-    notes: app.notes || "",
-    rating: app.rating || 0
-  })));
+      appliedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  ]);
 
   // Application timeline data - applications per month
   const applicationTimelineData = [4, 6, 3, 7, 8, 12, 11, 9, 14, 17, 13, 15];
@@ -431,78 +394,40 @@ export default function EmployerDashboard() {
   };
 
   // Update applicant status
-  const updateApplicantStatus = (applicantId: number, newStatus: string) => {
-    const updatedApplications = applications.map(application => {
-      if (application.id === applicantId) {
-        return {
-          ...application,
-          status: newStatus,
-          // If status is changed to interview, set a default date 3 days from now
-          interviewDate: newStatus === "interview" && !application.interviewDate 
-            ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-            : application.interviewDate,
-          interviewTime: newStatus === "interview" && !application.interviewTime
-            ? "14:00"
-            : application.interviewTime
-        };
-      }
-      return application;
-    });
-    
-    setApplications(updatedApplications);
-    
-    const statusMessages = {
-      pending: "Application marked as pending",
-      interview: "Candidate moved to interview stage",
-      accepted: "Candidate has been accepted",
-      rejected: "Candidate has been rejected"
-    };
-    
-    toast({
-      title: statusMessages[newStatus as keyof typeof statusMessages] || "Status updated",
-      description: "The applicant has been notified of the status change",
-    });
+  const updateApplicantStatus = (applicationId: string, newStatus: string) => {
+    setApplications(applications.map(app => 
+      app.id === applicationId ? {...app, status: newStatus as any} : app
+    ));
   };
 
   // View applicant details
-  const viewApplicantDetails = (applicantId: number) => {
-    const applicant = applications.find(app => app.id === applicantId);
+  const viewApplicantDetails = (applicationId: string) => {
+    const applicant = applications.find(app => app.id === applicationId);
     if (applicant) {
       setCurrentApplicant(applicant);
-      setApplicantNotes(applicant.notes || "");
       setInterviewDate(applicant.interviewDate || "");
       setInterviewTime(applicant.interviewTime || "");
-      setFeedbackRating(applicant.rating || 0);
+      setApplicantNotes("");
+      setFeedbackRating(0);
       setShowApplicantView(true);
     }
   };
 
   // Save applicant changes
   const saveApplicantChanges = () => {
-    if (!currentApplicant) return;
-    
-    const updatedApplications = applications.map(application => {
-      if (application.id === currentApplicant.id) {
-        return {
-          ...application,
-          notes: applicantNotes,
-          interviewDate: interviewDate,
-          interviewTime: interviewTime,
-          rating: feedbackRating,
-          feedback: application.feedback // Keep existing feedback
-        };
-      }
-      return application;
-    });
-    
-    setApplications(updatedApplications);
-    
-    toast({
-      title: "Applicant updated",
-      description: "The applicant information has been updated successfully",
-    });
-    
-    setShowApplicantView(false);
+    if (currentApplicant) {
+      setApplications(applications.map(app => 
+        app.id === currentApplicant.id 
+          ? {...app, 
+             status: currentApplicant.status, 
+             interviewDate: interviewDate,
+             interviewTime: interviewTime,
+             // In a real app, we would save notes and rating to the database
+            } 
+          : app
+      ));
+      setShowApplicantView(false);
+    }
   };
 
   // Filter applications by status
@@ -611,140 +536,216 @@ export default function EmployerDashboard() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-2">Employer Dashboard</h1>
-      <p className="text-muted-foreground mb-6">
-        Manage your internship listings, applications, and company profile.
-      </p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Employer Dashboard</h1>
+          <p className="text-muted-foreground">Manage internships and applications for {companyInfo.name}</p>
+        </div>
+        <Button 
+          onClick={() => {
+            setCurrentInternship(null);
+            setIsViewMode(false);
+            setShowInternshipForm(true);
+          }}
+          className="gap-2 bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white"
+        >
+          <Plus className="h-4 w-4" /> Post New Internship
+        </Button>
+      </div>
+
+      <div className="flex items-center mb-8 bg-card rounded-xl shadow-sm border">
+        <div className="p-6 flex items-center">
+          <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center overflow-hidden mr-5">
+            {companyInfo.logo ? (
+              <img src={companyInfo.logo} alt={companyInfo.name} className="w-full h-full object-cover" />
+            ) : (
+              <BuildingIcon className="h-8 w-8 text-muted-foreground" />
+            )}
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">{companyInfo.name}</h2>
+            <p className="text-muted-foreground text-sm">
+              {companyInfo.activeInternships} active internships • {companyInfo.totalPositions} total positions
+            </p>
+          </div>
+        </div>
+        <div className="ml-auto flex items-center pr-6 gap-4">
+          <div className="text-right">
+            <p className="text-sm text-muted-foreground mb-1">Application Response Rate</p>
+            <p className="text-xl font-semibold text-[#0A77FF]">94%</p>
+          </div>
+          <div className="h-10 border-l border-border"></div>
+          <div className="text-right">
+            <p className="text-sm text-muted-foreground mb-1">Average Hiring Time</p>
+            <p className="text-xl font-semibold text-[#0A77FF]">9 days</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <Card className="border-none shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-neutral-500 mb-1">Total Internships</p>
+                <h3 className="text-2xl font-bold">{stats.totalInternships}</h3>
+                <div className="flex items-center mt-1">
+                  <Badge variant="secondary" className="text-xs">
+                    {stats.activeInternships} Active
+                  </Badge>
+                </div>
+              </div>
+              <div className="p-3 bg-[#0A77FF]/10 text-[#0A77FF] rounded-full">
+                <BriefcaseIcon className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-none shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-neutral-500 mb-1">Applications</p>
+                <h3 className="text-2xl font-bold">{stats.totalApplications}</h3>
+                <p className="text-xs text-green-600 flex items-center mt-1">
+                  <TrendingUpIcon className="h-3 w-3 mr-1" /> 
+                  +5 this week
+                </p>
+              </div>
+              <div className="p-3 bg-[#0A77FF]/10 text-[#0A77FF] rounded-full">
+                <UsersIcon className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-none shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-neutral-500 mb-1">Interviews</p>
+                <h3 className="text-2xl font-bold">{stats.interviewingApplications}</h3>
+                <p className="text-xs text-neutral-500 flex items-center mt-1">
+                  Next in 2 days
+                </p>
+              </div>
+              <div className="p-3 bg-[#0A77FF]/10 text-[#0A77FF] rounded-full">
+                <CalendarIcon className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-none shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-neutral-500 mb-1">Pending Review</p>
+                <h3 className="text-2xl font-bold">{stats.pendingApplications}</h3>
+                <p className="text-xs text-amber-600 flex items-center mt-1">
+                  Requires attention
+                </p>
+              </div>
+              <div className="p-3 bg-[#0A77FF]/10 text-[#0A77FF] rounded-full">
+                <ClockIcon className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Tabs 
         value={activeTab} 
         onValueChange={setActiveTab}
-        className="space-y-8"
+        className="space-y-6"
       >
-        <TabsList className="w-full justify-start border-b pb-0">
-          <TabsTrigger value="overview" className="rounded-b-none">Overview</TabsTrigger>
-          <TabsTrigger value="internships" className="rounded-b-none">Manage Internships</TabsTrigger>
-          <TabsTrigger value="applicants" className="rounded-b-none">Applicants</TabsTrigger>
-          <TabsTrigger value="analytics" className="rounded-b-none">Analytics</TabsTrigger>
-        </TabsList>
+        <div className="bg-background rounded-lg border p-1">
+          <TabsList className="w-full grid grid-cols-3 bg-muted/50 p-1 h-auto">
+            <TabsTrigger 
+              value="overview" 
+              className={cn(
+                "rounded text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
+                "py-2"
+              )}
+            >
+              Overview
+            </TabsTrigger>
+            <TabsTrigger 
+              value="internships" 
+              className={cn(
+                "rounded text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
+                "py-2"
+              )}
+            >
+              Internships
+            </TabsTrigger>
+            <TabsTrigger 
+              value="applications" 
+              className={cn(
+                "rounded text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
+                "py-2"
+              )}
+            >
+              Applications
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Active Internships
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold">{stats.activeInternships}</div>
-                  <div className="p-2 bg-primary/10 rounded-full">
-                    <BriefcaseIcon className="text-primary h-5 w-5" />
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {stats.activeInternships} of {stats.totalInternships} total
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Applications
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold">{stats.totalApplications}</div>
-                  <div className="p-2 bg-primary/10 rounded-full">
-                    <UsersIcon className="text-primary h-5 w-5" />
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Across all internship positions
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Pending Applications
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold">{stats.pendingApplications}</div>
-                  <div className="p-2 bg-primary/10 rounded-full">
-                    <GraduationCapIcon className="text-primary h-5 w-5" />
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Awaiting your review
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Accepted Candidates
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold">{stats.acceptedApplications}</div>
-                  <div className="p-2 bg-primary/10 rounded-full">
-                    <CheckCircleIcon className="text-primary h-5 w-5" />
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Positions filled successfully
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
+        <TabsContent value="overview" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>Recent Applications</CardTitle>
-                <CardDescription>Latest candidates applying to your internships</CardDescription>
+            <Card className="border-none shadow-sm lg:col-span-2">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl">Recent Applications</CardTitle>
+                  <Button variant="outline" size="sm" className="h-8 gap-1 text-[#0A77FF] border-[#0A77FF] hover:bg-[#0A77FF]/5">
+                    View All <ChevronDownIcon className="h-3 w-3" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {applications.map((application) => (
-                    <div key={application.id} className="flex items-center justify-between border-b pb-3">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 rounded-full overflow-hidden mr-3">
-                          <img src={application.applicantPhoto} alt={application.applicantName} className="h-full w-full object-cover" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium">{application.applicantName}</h4>
-                          <div className="flex items-center">
+                  {getFilteredApplications("all").slice(0, 3).map((application: Application) => (
+                    <div 
+                      key={application.id} 
+                      className="flex items-center p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => viewApplicantDetails(application.id)}
+                    >
+                      <Avatar className="h-10 w-10 mr-4">
+                        <AvatarImage 
+                          src={application.applicantPhoto} 
+                          alt={application.applicantName} 
+                        />
+                        <AvatarFallback className="bg-[#0A77FF]/10 text-[#0A77FF]">
+                          {application.applicantName.split(' ').map((n: string) => n[0]).join('')}
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-medium">{application.applicantName}</h3>
                             <p className="text-sm text-muted-foreground">{application.internshipTitle}</p>
-                            <span className="mx-2 text-muted-foreground">•</span>
-                            <p className="text-sm text-muted-foreground">{application.university}</p>
                           </div>
+                          <Badge 
+                            className={
+                              application.status === "pending" ? "bg-amber-100 text-amber-700" :
+                              application.status === "interview" ? "bg-[#0A77FF]/10 text-[#0A77FF]" :
+                              application.status === "accepted" ? "bg-green-100 text-green-700" :
+                              "bg-red-100 text-red-700"
+                            }
+                          >
+                            {application.status === "pending" ? "Pending Review" :
+                             application.status === "interview" ? "Interview Scheduled" :
+                             application.status === "accepted" ? "Accepted" : "Rejected"}
+                          </Badge>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-xs text-muted-foreground">
-                          <CalendarIcon className="h-3 w-3 inline mr-1" />
-                          {new Date(application.appliedAt).toLocaleDateString()}
+                        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                          <span>Applied {formatRelativeTime(application.appliedAt)}</span>
+                          {application.interviewDate && (
+                            <span>Interview: {application.interviewDate} at {application.interviewTime}</span>
+                          )}
                         </div>
-                        <Badge 
-                          variant={
-                            application.status === "accepted" ? "default" :
-                            application.status === "rejected" ? "destructive" :
-                            application.status === "interview" ? "secondary" : 
-                            "outline"
-                          }
-                        >
-                          {application.status}
-                        </Badge>
                       </div>
                     </div>
                   ))}
@@ -752,50 +753,164 @@ export default function EmployerDashboard() {
               </CardContent>
             </Card>
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Application Trends</CardTitle>
-                <CardDescription>Recent application volume</CardDescription>
+            <Card className="border-none shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xl">Application Status</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-[200px] w-full">
-                  <div className="flex h-[170px] items-end gap-1 pt-2">
-                    {applicationTimelineData.map((count, i) => {
-                      const height = Math.max(15, (count / Math.max(...applicationTimelineData)) * 100);
-                      return (
-                        <div key={i} className="relative flex flex-1 flex-col items-center">
-                          <div 
-                            className="w-full bg-primary/90 rounded-t" 
-                            style={{ height: `${height}%` }}
-                          />
-                          <span className="absolute -bottom-5 text-xs text-muted-foreground">
-                            {new Date(2023, i).toLocaleString('default', { month: 'short' })}
-                          </span>
-                        </div>
-                      );
-                    })}
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-600">Pending</span>
+                      <span className="text-[#0A77FF] font-medium">{stats.pendingApplications}</span>
+                    </div>
+                    <div className="h-2 w-full bg-[#0A77FF]/10 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-amber-500 rounded-full" 
+                        style={{ width: `${(stats.pendingApplications / stats.totalApplications) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-600">Interviews</span>
+                      <span className="text-[#0A77FF] font-medium">{stats.interviewingApplications}</span>
+                    </div>
+                    <div className="h-2 w-full bg-[#0A77FF]/10 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-[#0A77FF] rounded-full" 
+                        style={{ width: `${(stats.interviewingApplications / stats.totalApplications) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-600">Accepted</span>
+                      <span className="text-[#0A77FF] font-medium">{stats.acceptedApplications}</span>
+                    </div>
+                    <div className="h-2 w-full bg-[#0A77FF]/10 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-green-500 rounded-full" 
+                        style={{ width: `${(stats.acceptedApplications / stats.totalApplications) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-600">Rejected</span>
+                      <span className="text-[#0A77FF] font-medium">{stats.rejectedApplications}</span>
+                    </div>
+                    <div className="h-2 w-full bg-[#0A77FF]/10 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-red-500 rounded-full" 
+                        style={{ width: `${(stats.rejectedApplications / stats.totalApplications) * 100}%` }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
+          
+          <Card className="border-none shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl">Your Internships</CardTitle>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="h-8 gap-1 text-[#0A77FF] border-[#0A77FF] hover:bg-[#0A77FF]/5"
+                  onClick={() => setActiveTab("internships")}
+                >
+                  Manage All <ChevronDownIcon className="h-3 w-3" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {internships.filter(internship => internship.status === "active").map((internship) => (
+                  <Card key={internship.id} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow">
+                    <CardHeader className="p-4 bg-[#0A77FF]/5">
+                      <div className="flex justify-between items-start">
+                        <CardTitle className="text-base font-medium">{internship.title}</CardTitle>
+                        <Badge 
+                          className="bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white"
+                        >
+                          Active
+                        </Badge>
+                      </div>
+                      <CardDescription className="flex items-center mt-1">
+                        <MapPinIcon className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
+                        {internship.location}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-2">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center text-sm">
+                          <UsersIcon className="h-4 w-4 mr-2 text-muted-foreground" /> 
+                          <span className="text-muted-foreground">
+                            {internship.applicants} applicants
+                          </span>
+                        </div>
+                        <div className="flex items-center text-sm">
+                          <BriefcaseIcon className="h-4 w-4 mr-2 text-muted-foreground" /> 
+                          <span className="text-muted-foreground">
+                            {internship.workType.charAt(0).toUpperCase() + internship.workType.slice(1)}
+                          </span>
+                        </div>
+                        <div className="flex items-center text-sm">
+                          <CalendarIcon className="h-4 w-4 mr-2 text-muted-foreground" /> 
+                          <span className="text-muted-foreground">
+                            Deadline: {new Date(internship.deadline).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="p-4 pt-0 flex justify-end gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="h-8 gap-1 text-[#0A77FF] border-[#0A77FF] hover:bg-[#0A77FF]/5"
+                        onClick={() => handleViewInternship(internship)}
+                      >
+                        <EyeIcon className="h-4 w-4" /> View
+                      </Button>
+                      <Button 
+                        size="sm"
+                        className="h-8 gap-1 bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white"
+                        onClick={() => handleEditInternship(internship)}
+                      >
+                        <PencilIcon className="h-4 w-4" /> Edit
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="internships">
           <div className="space-y-6">
-            <Card>
+            <Card className="border-none shadow-sm">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Your Internship Listings</CardTitle>
+                    <CardTitle className="text-xl">Your Internship Listings</CardTitle>
                     <CardDescription>Manage your current and upcoming internship opportunities</CardDescription>
                   </div>
-                  <Button onClick={() => {
-                    setCurrentInternship(null);
-                    setIsViewMode(false);
-                    setShowInternshipForm(true);
-                  }}>
-                    <Plus className="h-4 w-4 mr-2" />
+                  <Button 
+                    onClick={() => {
+                      setCurrentInternship(null);
+                      setIsViewMode(false);
+                      setShowInternshipForm(true);
+                    }}
+                    className="gap-2 bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white"
+                  >
+                    <Plus className="h-4 w-4" />
                     Create New Listing
                   </Button>
                 </div>
@@ -803,7 +918,7 @@ export default function EmployerDashboard() {
               <CardContent>
                 <div className="space-y-4">
                   {internships.map((internship) => (
-                    <div key={internship.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-neutral-50">
+                    <div key={internship.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                       <div>
                         <h3 className="font-medium">{internship.title}</h3>
                         <div className="flex items-center text-sm text-muted-foreground mt-1">
@@ -823,25 +938,26 @@ export default function EmployerDashboard() {
                           <div className="font-semibold">{applications.filter(app => app.internshipId === internship.id).length}</div>
                           <div className="text-xs text-muted-foreground">Applicants</div>
                         </div>
-                        <Badge variant={
-                          internship.status === "active" ? "default" :
-                          internship.status === "draft" ? "outline" :
-                          "secondary"
+                        <Badge className={
+                          internship.status === "active" ? "bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white" :
+                          internship.status === "draft" ? "bg-muted text-muted-foreground" :
+                          "bg-neutral-200 text-neutral-700"
                         }>
                           {internship.status === "active" ? "Active" : 
                            internship.status === "draft" ? "Draft" : "Closed"}
                         </Badge>
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleViewInternship(internship)}>
+                          <Button variant="ghost" size="icon" onClick={() => handleViewInternship(internship)} className="h-8 w-8 text-neutral-600 hover:text-[#0A77FF] hover:bg-[#0A77FF]/5">
                             <EyeIcon className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleEditInternship(internship)}>
+                          <Button variant="ghost" size="icon" onClick={() => handleEditInternship(internship)} className="h-8 w-8 text-neutral-600 hover:text-[#0A77FF] hover:bg-[#0A77FF]/5">
                             <PencilIcon className="h-4 w-4" />
                           </Button>
                           <Button 
                             variant="ghost" 
                             size="icon" 
                             onClick={() => toggleInternshipStatus(internship)}
+                            className="h-8 w-8 text-neutral-600 hover:text-[#0A77FF] hover:bg-[#0A77FF]/5"
                           >
                             {internship.status === "active" ? (
                               <XIcon className="h-4 w-4" />
@@ -849,8 +965,13 @@ export default function EmployerDashboard() {
                               <CheckIcon className="h-4 w-4" />
                             )}
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => confirmDelete(internship)}>
-                            <TrashIcon className="h-4 w-4 text-red-500" />
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => confirmDelete(internship)}
+                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          >
+                            <TrashIcon className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
@@ -863,12 +984,15 @@ export default function EmployerDashboard() {
                     <BriefcaseIcon className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
                     <h3 className="text-lg font-medium mb-2">No internships yet</h3>
                     <p className="text-muted-foreground mb-4">Create your first internship listing to start attracting candidates.</p>
-                    <Button onClick={() => {
-                      setCurrentInternship(null);
-                      setIsViewMode(false);
-                      setShowInternshipForm(true);
-                    }}>
-                      <Plus className="h-4 w-4 mr-2" />
+                    <Button 
+                      onClick={() => {
+                        setCurrentInternship(null);
+                        setIsViewMode(false);
+                        setShowInternshipForm(true);
+                      }}
+                      className="gap-2 bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white"
+                    >
+                      <Plus className="h-4 w-4" />
                       Create New Listing
                     </Button>
                   </div>
@@ -901,6 +1025,7 @@ export default function EmployerDashboard() {
                             onChange={handleInputChange} 
                             placeholder="e.g., UX/UI Design Intern"
                             disabled={isViewMode}
+                            className="border-input focus-visible:ring-[#0A77FF]"
                           />
                         </div>
                         <div className="space-y-2">
@@ -912,6 +1037,7 @@ export default function EmployerDashboard() {
                             onChange={handleInputChange} 
                             placeholder="e.g., Design, Engineering, Marketing"
                             disabled={isViewMode}
+                            className="border-input focus-visible:ring-[#0A77FF]"
                           />
                         </div>
                       </div>
@@ -926,6 +1052,7 @@ export default function EmployerDashboard() {
                             onChange={handleInputChange} 
                             placeholder="e.g., Paris, France"
                             disabled={isViewMode}
+                            className="border-input focus-visible:ring-[#0A77FF]"
                           />
                         </div>
                         <div className="space-y-2">
@@ -935,7 +1062,7 @@ export default function EmployerDashboard() {
                             onValueChange={(value) => handleSelectChange("workType", value)}
                             disabled={isViewMode}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="border-input focus-visible:ring-[#0A77FF]">
                               <SelectValue placeholder="Select type" />
                             </SelectTrigger>
                             <SelectContent>
@@ -957,6 +1084,7 @@ export default function EmployerDashboard() {
                             onChange={handleInputChange} 
                             placeholder="e.g., 3 months, 6 months"
                             disabled={isViewMode}
+                            className="border-input focus-visible:ring-[#0A77FF]"
                           />
                         </div>
                         <div className="space-y-2">
@@ -968,6 +1096,7 @@ export default function EmployerDashboard() {
                             onChange={handleInputChange} 
                             placeholder="e.g., €800/month"
                             disabled={isViewMode}
+                            className="border-input focus-visible:ring-[#0A77FF]"
                           />
                         </div>
                       </div>
@@ -982,6 +1111,7 @@ export default function EmployerDashboard() {
                           placeholder="Describe the internship role and responsibilities"
                           rows={4}
                           disabled={isViewMode}
+                          className="border-input focus-visible:ring-[#0A77FF]"
                         />
                       </div>
 
@@ -995,6 +1125,7 @@ export default function EmployerDashboard() {
                           placeholder="List the skills and qualifications required"
                           rows={4}
                           disabled={isViewMode}
+                          className="border-input focus-visible:ring-[#0A77FF]"
                         />
                       </div>
 
@@ -1007,6 +1138,7 @@ export default function EmployerDashboard() {
                           value={internshipForm.applicationDeadline} 
                           onChange={handleInputChange}
                           disabled={isViewMode}
+                          className="border-input focus-visible:ring-[#0A77FF]"
                         />
                       </div>
                     </div>
@@ -1016,7 +1148,11 @@ export default function EmployerDashboard() {
                         {isViewMode ? "Close" : "Cancel"}
                       </Button>
                       {!isViewMode && (
-                        <Button type="submit" onClick={handleCreateInternship}>
+                        <Button 
+                          type="submit" 
+                          onClick={handleCreateInternship}
+                          className="bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white"
+                        >
                           {currentInternship ? "Save Changes" : "Create Internship"}
                         </Button>
                       )}
@@ -1045,27 +1181,42 @@ export default function EmployerDashboard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-none shadow-sm">
               <CardHeader>
-                <CardTitle>Internship Applications Overview</CardTitle>
+                <CardTitle className="text-xl">Internship Applications Overview</CardTitle>
                 <CardDescription>Status of applications across all your internship listings</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   {internships
                     .filter(internship => applications.filter(app => app.internshipId === internship.id).length > 0)
-                    .map(internship => (
-                      <div key={internship.id} className="border rounded-lg p-4">
-                        <h3 className="font-medium text-sm">{internship.title}</h3>
-                        <div className="mt-2 flex items-center">
-                          <UsersIcon className="h-4 w-4 text-primary mr-2" />
-                          <span className="text-2xl font-bold">{applications.filter(app => app.internshipId === internship.id).length}</span>
+                    .map(internship => {
+                      const internshipApps = applications.filter(app => app.internshipId === internship.id);
+                      return (
+                        <div key={internship.id} className="border rounded-lg p-4 hover:border-[#0A77FF]/50 hover:shadow-sm transition-all">
+                          <h3 className="font-medium text-sm">{internship.title}</h3>
+                          <div className="mt-2 flex items-center">
+                            <UsersIcon className="h-4 w-4 text-[#0A77FF] mr-2" />
+                            <span className="text-2xl font-bold">{internshipApps.length}</span>
+                          </div>
+                          <div className="mt-2 pt-2 border-t border-neutral-100">
+                            <div className="grid grid-cols-2 gap-1 text-xs">
+                              <div className="flex gap-1 items-center">
+                                <div className="w-2 h-2 rounded-full bg-amber-400"></div>
+                                <span>{internshipApps.filter(a => a.status === "pending").length} Pending</span>
+                              </div>
+                              <div className="flex gap-1 items-center">
+                                <div className="w-2 h-2 rounded-full bg-[#0A77FF]"></div>
+                                <span>{internshipApps.filter(a => a.status === "interview").length} Interview</span>
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {internship.status === "active" ? "Active" : "Closed"} • {internship.location}
+                          </p>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {internship.status === "active" ? "Active" : "Closed"} - {internship.location}
-                        </p>
-                      </div>
-                    ))}
+                      );
+                    })}
                     
                   {internships.filter(internship => applications.filter(app => app.internshipId === internship.id).length > 0).length === 0 && (
                     <div className="col-span-4 text-center py-8">
@@ -1079,25 +1230,74 @@ export default function EmployerDashboard() {
           </div>
         </TabsContent>
 
-        <TabsContent value="applicants">
+        <TabsContent value="applications">
           <div className="space-y-6">
-            <Card>
+            <Card className="border-none shadow-sm">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>All Applications</CardTitle>
+                    <CardTitle className="text-xl">All Applications</CardTitle>
                     <CardDescription>Review and manage incoming applications</CardDescription>
                   </div>
-                  <div className="flex gap-2">
-                    <Tabs value={applicantStatusFilter} onValueChange={setApplicantStatusFilter} className="w-[400px]">
-                      <TabsList>
-                        <TabsTrigger value="all">All</TabsTrigger>
-                        <TabsTrigger value="pending">Pending</TabsTrigger>
-                        <TabsTrigger value="interview">Interview</TabsTrigger>
-                        <TabsTrigger value="accepted">Accepted</TabsTrigger>
-                        <TabsTrigger value="rejected">Rejected</TabsTrigger>
-                      </TabsList>
-                    </Tabs>
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <SearchIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <Input 
+                        placeholder="Search applications..." 
+                        className="pl-9 w-[240px] border-input focus-visible:ring-[#0A77FF]"
+                      />
+                    </div>
+                    <div className="relative">
+                      <Tabs value={applicantStatusFilter} onValueChange={setApplicantStatusFilter} className="w-[400px]">
+                        <TabsList className="bg-muted/50 p-1 h-auto">
+                          <TabsTrigger 
+                            value="all" 
+                            className={cn(
+                              "rounded text-sm data-[state=active]:bg-[#0A77FF] data-[state=active]:text-white",
+                              "py-1.5 px-3"
+                            )}
+                          >
+                            All
+                          </TabsTrigger>
+                          <TabsTrigger 
+                            value="pending" 
+                            className={cn(
+                              "rounded text-sm data-[state=active]:bg-[#0A77FF] data-[state=active]:text-white",
+                              "py-1.5 px-3"
+                            )}
+                          >
+                            Pending
+                          </TabsTrigger>
+                          <TabsTrigger 
+                            value="interview" 
+                            className={cn(
+                              "rounded text-sm data-[state=active]:bg-[#0A77FF] data-[state=active]:text-white",
+                              "py-1.5 px-3"
+                            )}
+                          >
+                            Interview
+                          </TabsTrigger>
+                          <TabsTrigger 
+                            value="accepted" 
+                            className={cn(
+                              "rounded text-sm data-[state=active]:bg-[#0A77FF] data-[state=active]:text-white",
+                              "py-1.5 px-3"
+                            )}
+                          >
+                            Accepted
+                          </TabsTrigger>
+                          <TabsTrigger 
+                            value="rejected" 
+                            className={cn(
+                              "rounded text-sm data-[state=active]:bg-[#0A77FF] data-[state=active]:text-white",
+                              "py-1.5 px-3"
+                            )}
+                          >
+                            Rejected
+                          </TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
@@ -1106,11 +1306,21 @@ export default function EmployerDashboard() {
                   {applications
                     .filter(application => applicantStatusFilter === "all" || application.status === applicantStatusFilter)
                     .map((application) => (
-                    <div key={application.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-neutral-50">
+                    <div 
+                      key={application.id} 
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => viewApplicantDetails(application.id)}
+                    >
                       <div className="flex items-center">
-                        <div className="h-10 w-10 rounded-full overflow-hidden mr-3">
-                          <img src={application.applicantPhoto} alt={application.applicantName} className="h-full w-full object-cover" />
-                        </div>
+                        <Avatar className="h-10 w-10 mr-4">
+                          <AvatarImage 
+                            src={application.applicantPhoto} 
+                            alt={application.applicantName} 
+                          />
+                          <AvatarFallback className="bg-primary/10 text-primary">
+                            {application.applicantName.split(' ').map((n) => n[0]).join('')}
+                          </AvatarFallback>
+                        </Avatar>
                         <div>
                           <h4 className="font-medium">{application.applicantName}</h4>
                           <div className="flex items-center">
@@ -1119,7 +1329,7 @@ export default function EmployerDashboard() {
                             <p className="text-sm text-muted-foreground">{application.university}</p>
                           </div>
                           {application.status === "interview" && application.interviewDate && (
-                            <div className="mt-1 inline-flex items-center text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
+                            <div className="mt-1 inline-flex items-center text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
                               <CalendarIcon className="h-3 w-3 mr-1" />
                               Interview: {new Date(application.interviewDate).toLocaleDateString()} at {application.interviewTime}
                             </div>
@@ -1129,20 +1339,24 @@ export default function EmployerDashboard() {
                       <div className="flex items-center gap-4">
                         <div className="text-xs text-muted-foreground">
                           <CalendarIcon className="h-3 w-3 inline mr-1" />
-                          {new Date(application.appliedAt).toLocaleDateString()}
+                          {formatRelativeTime(application.appliedAt)}
                         </div>
-                        <Badge 
-                          variant={
-                            application.status === "accepted" ? "default" :
-                            application.status === "rejected" ? "destructive" :
-                            application.status === "interview" ? "secondary" : 
-                            "outline"
-                          }
-                        >
-                          {application.status}
+                        <Badge className={
+                          application.status === "pending" ? "bg-amber-100 text-amber-700" :
+                          application.status === "interview" ? "bg-primary/10 text-primary" :
+                          application.status === "accepted" ? "bg-green-100 text-green-700" :
+                          "bg-red-100 text-red-700"
+                        }>
+                          {application.status === "pending" ? "Pending Review" :
+                          application.status === "interview" ? "Interview" :
+                          application.status === "accepted" ? "Accepted" : "Rejected"}
                         </Badge>
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => viewApplicantDetails(application.id)}>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 gap-1 text-primary border-primary hover:bg-primary/5"
+                          >
                             View Details
                           </Button>
                         </div>
@@ -1179,19 +1393,26 @@ export default function EmployerDashboard() {
                           {currentApplicant.applicantName}
                           <Badge 
                             variant={
+                              currentApplicant.status === "pending" ? "secondary" :
+                              currentApplicant.status === "interview" ? "default" :
                               currentApplicant.status === "accepted" ? "default" :
-                              currentApplicant.status === "rejected" ? "destructive" :
-                              currentApplicant.status === "interview" ? "secondary" : 
                               "outline"
                             }
-                            className="ml-2"
+                            className={
+                              currentApplicant.status === "pending" ? "ml-2" :
+                              currentApplicant.status === "interview" ? "bg-primary text-primary-foreground ml-2" :
+                              currentApplicant.status === "accepted" ? "bg-green-600 hover:bg-green-700 text-white ml-2" :
+                              "bg-red-100 text-red-700 ml-2"
+                            }
                           >
-                            {currentApplicant.status}
+                            {currentApplicant.status === "pending" ? "Pending Review" :
+                              currentApplicant.status === "interview" ? "Interview" :
+                              currentApplicant.status === "accepted" ? "Accepted" : "Rejected"}
                           </Badge>
                         </div>
                       </DialogTitle>
                       <DialogDescription>
-                        Application for {currentApplicant.internshipTitle} • Applied {new Date(currentApplicant.appliedAt).toLocaleDateString()}
+                        Application for {currentApplicant.internshipTitle} • Applied {formatRelativeTime(currentApplicant.appliedAt)}
                       </DialogDescription>
                     </DialogHeader>
 
@@ -1214,7 +1435,7 @@ export default function EmployerDashboard() {
                           {currentApplicant.portfolio && (
                             <div className="flex">
                               <span className="w-20 text-muted-foreground">Portfolio:</span>
-                              <a href={currentApplicant.portfolio} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                              <a href={currentApplicant.portfolio} target="_blank" rel="noopener noreferrer" className="text-[#0A77FF] hover:underline">
                                 View Portfolio
                               </a>
                             </div>
@@ -1224,12 +1445,12 @@ export default function EmployerDashboard() {
                         <h3 className="text-sm font-medium mt-4 mb-2">Skills</h3>
                         <div className="flex flex-wrap gap-1">
                           {currentApplicant.skills.map((skill: string, index: number) => (
-                            <Badge key={index} variant="outline">{skill}</Badge>
+                            <Badge key={index} variant="outline" className="bg-[#0A77FF]/5 text-[#0A77FF] border-[#0A77FF]/20">{skill}</Badge>
                           ))}
                         </div>
 
                         <h3 className="text-sm font-medium mt-4 mb-2">Cover Letter</h3>
-                        <div className="bg-neutral-50 p-3 rounded-md text-sm max-h-[150px] overflow-y-auto">
+                        <div className="bg-muted/50 p-3 rounded-md text-sm max-h-[150px] overflow-y-auto">
                           {currentApplicant.coverLetter}
                         </div>
                       </div>
@@ -1244,6 +1465,7 @@ export default function EmployerDashboard() {
                               type="date"
                               value={interviewDate}
                               onChange={(e) => setInterviewDate(e.target.value)}
+                              className="border-input focus-visible:ring-[#0A77FF]"
                             />
                           </div>
                           <div className="space-y-2">
@@ -1253,6 +1475,7 @@ export default function EmployerDashboard() {
                               type="time"
                               value={interviewTime}
                               onChange={(e) => setInterviewTime(e.target.value)}
+                              className="border-input focus-visible:ring-[#0A77FF]"
                             />
                           </div>
                         </div>
@@ -1265,6 +1488,7 @@ export default function EmployerDashboard() {
                             rows={5}
                             value={applicantNotes}
                             onChange={(e) => setApplicantNotes(e.target.value)}
+                            className="border-input focus-visible:ring-[#0A77FF]"
                           />
                         </div>
 
@@ -1288,12 +1512,12 @@ export default function EmployerDashboard() {
                           <h3 className="text-sm font-medium mb-2">Application Status</h3>
                           <Select 
                             defaultValue={currentApplicant.status}
-                            onValueChange={(value) => {
+                            onValueChange={(value: "pending" | "interview" | "accepted" | "rejected") => {
                               updateApplicantStatus(currentApplicant.id, value);
                               setCurrentApplicant({...currentApplicant, status: value});
                             }}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full border-input focus-visible:ring-primary">
                               <SelectValue placeholder="Change status" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1309,16 +1533,21 @@ export default function EmployerDashboard() {
 
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setShowApplicantView(false)}>Cancel</Button>
-                      <Button onClick={saveApplicantChanges}>Save Changes</Button>
+                      <Button 
+                        onClick={saveApplicantChanges}
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                      >
+                        Save Changes
+                      </Button>
                     </DialogFooter>
                   </>
                 )}
               </DialogContent>
             </Dialog>
 
-            <Card>
+            <Card className="border-none shadow-sm">
               <CardHeader>
-                <CardTitle>Applications by Internship</CardTitle>
+                <CardTitle className="text-xl">Applications by Internship</CardTitle>
                 <CardDescription>Overview of applications for each internship position</CardDescription>
               </CardHeader>
               <CardContent>
@@ -1330,8 +1559,10 @@ export default function EmployerDashboard() {
                     const acceptedCount = internshipApplications.filter(app => app.status === 'accepted').length;
                     const rejectedCount = internshipApplications.filter(app => app.status === 'rejected').length;
                     
+                    if (internshipApplications.length === 0) return null;
+                    
                     return (
-                      <Card key={internship.id}>
+                      <Card key={internship.id} className="border">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-base">{internship.title}</CardTitle>
                           <CardDescription className="text-xs">{internship.department} • {internship.location}</CardDescription>
@@ -1340,22 +1571,42 @@ export default function EmployerDashboard() {
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                               <span>Total Applications</span>
-                              <span className="font-medium">{internshipApplications.length}</span>
+                              <span className="text-[#0A77FF] font-medium">{internshipApplications.length}</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-[#0A77FF]/10 rounded-full overflow-hidden">
+                              <div className="flex h-full">
+                                <div 
+                                  className="bg-amber-500 h-full" 
+                                  style={{ width: `${(pendingCount / internshipApplications.length) * 100}%` }}
+                                ></div>
+                                <div 
+                                  className="bg-[#0A77FF] h-full" 
+                                  style={{ width: `${(interviewCount / internshipApplications.length) * 100}%` }}
+                                ></div>
+                                <div 
+                                  className="bg-green-500 h-full" 
+                                  style={{ width: `${(acceptedCount / internshipApplications.length) * 100}%` }}
+                                ></div>
+                                <div 
+                                  className="bg-red-500 h-full" 
+                                  style={{ width: `${(rejectedCount / internshipApplications.length) * 100}%` }}
+                                ></div>
+                              </div>
                             </div>
                             <div className="grid grid-cols-2 gap-2 mt-3">
-                              <div className="bg-neutral-50 p-2 rounded text-center">
+                              <div className="bg-muted p-2 rounded text-center">
                                 <div className="text-amber-500 font-medium">{pendingCount}</div>
                                 <div className="text-xs text-muted-foreground">Pending</div>
                               </div>
-                              <div className="bg-neutral-50 p-2 rounded text-center">
-                                <div className="text-blue-500 font-medium">{interviewCount}</div>
+                              <div className="bg-muted p-2 rounded text-center">
+                                <div className="text-[#0A77FF] font-medium">{interviewCount}</div>
                                 <div className="text-xs text-muted-foreground">Interview</div>
                               </div>
-                              <div className="bg-neutral-50 p-2 rounded text-center">
+                              <div className="bg-muted p-2 rounded text-center">
                                 <div className="text-green-500 font-medium">{acceptedCount}</div>
                                 <div className="text-xs text-muted-foreground">Accepted</div>
                               </div>
-                              <div className="bg-neutral-50 p-2 rounded text-center">
+                              <div className="bg-muted p-2 rounded text-center">
                                 <div className="text-red-500 font-medium">{rejectedCount}</div>
                                 <div className="text-xs text-muted-foreground">Rejected</div>
                               </div>
@@ -1368,128 +1619,39 @@ export default function EmployerDashboard() {
                 </div>
               </CardContent>
             </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="analytics">
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Application Status</CardTitle>
-                  <CardDescription>Distribution of your applications</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span>Pending</span>
-                        <span className="font-medium">{stats.pendingApplications}</span>
-                      </div>
-                      <div className="h-3 bg-neutral-100 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-amber-500 rounded-full" 
-                          style={{ width: `${(stats.pendingApplications / stats.totalApplications) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span>In Progress</span>
-                        <span className="font-medium">{stats.interviewingApplications}</span>
-                      </div>
-                      <div className="h-3 bg-neutral-100 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-blue-500 rounded-full" 
-                          style={{ width: `${(stats.interviewingApplications / stats.totalApplications) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span>Accepted</span>
-                        <span className="font-medium">{stats.acceptedApplications}</span>
-                      </div>
-                      <div className="h-3 bg-neutral-100 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-green-500 rounded-full" 
-                          style={{ width: `${(stats.acceptedApplications / stats.totalApplications) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span>Rejected</span>
-                        <span className="font-medium">{stats.rejectedApplications}</span>
-                      </div>
-                      <div className="h-3 bg-neutral-100 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-red-500 rounded-full" 
-                          style={{ width: `${(stats.rejectedApplications / stats.totalApplications) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Application Timeline</CardTitle>
-                  <CardDescription>Applications received over time</CardDescription>
-                </CardHeader>
-                <CardContent className="px-2">
-                  <div className="h-[200px] w-full">
-                    <div className="flex h-[170px] items-end gap-1 pt-6">
-                      {applicationTimelineData.map((count, i) => {
-                        const height = Math.max(15, (count / Math.max(...applicationTimelineData)) * 100);
-                        return (
-                          <div key={i} className="relative flex flex-1 flex-col items-center">
-                            <div 
-                              className="w-full bg-primary/90 rounded-t" 
-                              style={{ height: `${height}%` }}
-                            />
-                            <span className="absolute -bottom-5 text-xs text-muted-foreground">
-                              {new Date(2023, i).toLocaleString('default', { month: 'short' })}
-                            </span>
-                            <span className="absolute -top-5 text-xs font-medium">
-                              {count}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
             
-            <Card>
+            <Card className="border-none shadow-sm">
               <CardHeader>
-                <CardTitle>Recruiting Efficiency</CardTitle>
-                <CardDescription>Key metrics for your hiring process</CardDescription>
+                <CardTitle className="text-xl">Key Metrics</CardTitle>
+                <CardDescription>Performance indicators for your recruiting process</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-neutral-50 p-4 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">Time to Fill</div>
-                    <div className="text-2xl font-bold">14.3 days</div>
-                    <div className="text-xs text-green-600 mt-1">↓ 12% from last month</div>
+                  <div className="bg-muted/50 p-4 rounded-lg">
+                    <div className="text-sm text-muted-foreground mb-1">Interview Rate</div>
+                    <div className="text-2xl font-bold">
+                      {Math.round((stats.interviewingApplications / stats.totalApplications) * 100)}%
+                    </div>
+                    <div className="text-xs text-green-600 mt-1">↑ 4% from last month</div>
                   </div>
-                  <div className="bg-neutral-50 p-4 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">Cost per Hire</div>
-                    <div className="text-2xl font-bold">€250</div>
-                    <div className="text-xs text-green-600 mt-1">↓ 8% from last month</div>
+                  <div className="bg-muted/50 p-4 rounded-lg">
+                    <div className="text-sm text-muted-foreground mb-1">Time to Response</div>
+                    <div className="text-2xl font-bold">2.3 days</div>
+                    <div className="text-xs text-green-600 mt-1">↓ 1.2 days from last month</div>
                   </div>
-                  <div className="bg-neutral-50 p-4 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">Application Quality</div>
-                    <div className="text-2xl font-bold">72%</div>
-                    <div className="text-xs text-green-600 mt-1">↑ 5% from last month</div>
+                  <div className="bg-muted/50 p-4 rounded-lg">
+                    <div className="text-sm text-muted-foreground mb-1">Acceptance Rate</div>
+                    <div className="text-2xl font-bold">
+                      {Math.round((stats.acceptedApplications / stats.interviewingApplications) * 100)}%
+                    </div>
+                    <div className="text-xs text-green-600 mt-1">↑ 8% from last month</div>
                   </div>
-                  <div className="bg-neutral-50 p-4 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">Response Rate</div>
-                    <div className="text-2xl font-bold">89%</div>
-                    <div className="text-xs text-green-600 mt-1">↑ 3% from last month</div>
+                  <div className="bg-muted/50 p-4 rounded-lg">
+                    <div className="text-sm text-muted-foreground mb-1">Average Rating</div>
+                    <div className="text-2xl font-bold">4.2</div>
+                    <div className="flex text-yellow-400 mt-1">
+                      {"★".repeat(4)}{"☆".repeat(1)}
+                    </div>
                   </div>
                 </div>
               </CardContent>

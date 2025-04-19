@@ -2,60 +2,117 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { BriefcaseIcon, HomeIcon, UserPlusIcon, MessageSquareIcon, BellIcon, NetworkIcon, MenuIcon, ChevronDownIcon, SearchIcon, UserIcon } from "lucide-react";
+import { BriefcaseIcon, HomeIcon, UserPlusIcon, MessageSquareIcon, BellIcon, MenuIcon, ChevronDownIcon, SearchIcon, UserIcon, LogOutIcon, BookOpenIcon, SettingsIcon, HelpCircleIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import SearchBar from "@/components/ui/SearchBar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
 
 const Header = () => {
   const [location] = useLocation();
   const { user, logout, isAuthenticated } = useAuth();
   const isMobile = useIsMobile();
+  const [scrolled, setScrolled] = useState(false);
 
-  const NavItem = ({ href, icon, label, active, notifications }: { 
+  // Handle scroll effect for shadow
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 10) {
+        setScrolled(true);
+      } else {
+        setScrolled(false);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const NavItem = ({ 
+    href, 
+    icon, 
+    label, 
+    active, 
+    notifications,
+    isDesktop = true
+  }: { 
     href: string; 
     icon: React.ReactNode; 
     label: string; 
     active?: boolean;
     notifications?: number;
+    isDesktop?: boolean;
   }) => (
     <Link href={href}>
-      <div className={`flex flex-col items-center p-2 rounded-lg ${active ? 'text-primary-600' : 'text-neutral-500 hover:bg-neutral-100'}`}>
+      <div className={cn(
+        "flex items-center transition-all duration-200",
+        isDesktop ? "flex-col py-1 px-3" : "flex-row space-x-3 px-4 py-3",
+        active 
+          ? "text-[#0A77FF] border-b-2 border-[#0A77FF]" 
+          : "text-neutral-500 hover:text-neutral-700 border-b-2 border-transparent"
+      )}>
         <div className="relative">
           {icon}
           {notifications && notifications > 0 && (
-            <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0">
+            <Badge 
+              variant="destructive" 
+              className={cn(
+                "bg-[#0A77FF] hover:bg-[#0A77FF] text-white border-2 border-white",
+                isDesktop 
+                  ? "absolute -top-1 -right-1 h-4 w-4 flex items-center justify-center p-0 text-[9px]" 
+                  : "ml-auto text-[10px]"
+              )}
+            >
               {notifications}
             </Badge>
           )}
         </div>
-        <span className="text-xs mt-1">{label}</span>
+        <span className={cn(
+          isDesktop ? "text-xs mt-1" : "text-sm font-medium"
+        )}>
+          {label}
+        </span>
       </div>
     </Link>
   );
 
   return (
-    <header className="bg-white border-b border-neutral-200 sticky top-0 z-50">
-      <div className="container mx-auto px-4 flex items-center justify-between h-16">
-        <div className="flex items-center space-x-4">
+    <header className={cn(
+      "bg-white sticky top-0 z-50 transition-all duration-300",
+      scrolled ? "shadow-md" : "border-b border-neutral-200"
+    )}>
+      <div className="container mx-auto flex items-center justify-between h-16">
+        <div className="flex items-center space-x-3">
           <Link href="/">
             <div className="flex items-center space-x-2">
-              <div className="text-primary-600 text-2xl">
+              <div className="text-[#0A77FF] text-2xl">
                 <BriefcaseIcon />
               </div>
-              <span className="font-bold text-xl text-primary-700">StageConnect</span>
+              <span className="font-bold text-xl text-[#0A77FF]">StageConnect</span>
             </div>
           </Link>
           
-          {isAuthenticated && !isMobile && <SearchBar />}
+          {isAuthenticated && !isMobile && (
+            <div className="relative max-w-md w-full ml-4">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <SearchIcon className="h-4 w-4 text-neutral-400" />
+              </div>
+              <input
+                className="block w-full pl-10 pr-3 py-2 border border-neutral-300 rounded-md bg-neutral-50 text-sm placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-[#0A77FF] focus:border-transparent"
+                placeholder="Search..."
+                type="text"
+              />
+            </div>
+          )}
         </div>
         
         {isAuthenticated && (
           <>
             {!isMobile ? (
-              <nav className="flex items-center space-x-1">
+              <nav className="flex items-center h-full">
                 <NavItem 
                   href="/" 
                   icon={<HomeIcon className="h-5 w-5" />} 
@@ -65,7 +122,7 @@ const Header = () => {
                 <NavItem 
                   href="/network" 
                   icon={<UserPlusIcon className="h-5 w-5" />} 
-                  label="Network" 
+                  label="My Network" 
                   active={location === '/network'} 
                 />
                 <NavItem 
@@ -77,7 +134,7 @@ const Header = () => {
                 <NavItem 
                   href="/messaging" 
                   icon={<MessageSquareIcon className="h-5 w-5" />} 
-                  label="Messages" 
+                  label="Messaging" 
                   active={location === '/messaging'} 
                   notifications={3}
                 />
@@ -91,65 +148,116 @@ const Header = () => {
                 <NavItem 
                   href="/profile" 
                   icon={<UserIcon className="h-5 w-5" />} 
-                  label="Profile" 
+                  label="Me" 
                   active={location === '/profile'} 
                 />
               </nav>
             ) : (
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" className="text-neutral-700">
                     <MenuIcon className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right">
-                  <div className="flex flex-col gap-4 py-4">
-                    <Link href="/">
-                      <div className="flex items-center space-x-3 px-4 py-2 rounded-md hover:bg-neutral-100">
-                        <HomeIcon className="h-5 w-5" />
-                        <span>Home</span>
+                <SheetContent side="right" className="p-0">
+                  <div className="p-4 border-b">
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="h-10 w-10 border">
+                        <AvatarImage 
+                          src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80" 
+                          alt="User profile" 
+                        />
+                        <AvatarFallback className="bg-[#0A77FF]/10 text-[#0A77FF]">AJ</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h3 className="font-medium">Alex Johnson</h3>
+                        <p className="text-xs text-neutral-500">Student</p>
                       </div>
-                    </Link>
-                    <Link href="/network">
-                      <div className="flex items-center space-x-3 px-4 py-2 rounded-md hover:bg-neutral-100">
-                        <UserPlusIcon className="h-5 w-5" />
-                        <span>Network</span>
-                      </div>
-                    </Link>
-                    <Link href="/internships">
-                      <div className="flex items-center space-x-3 px-4 py-2 rounded-md hover:bg-neutral-100">
-                        <BriefcaseIcon className="h-5 w-5" />
-                        <span>Internships</span>
-                      </div>
-                    </Link>
-                    <Link href="/messaging">
-                      <div className="flex items-center space-x-3 px-4 py-2 rounded-md hover:bg-neutral-100">
-                        <MessageSquareIcon className="h-5 w-5" />
-                        <span>Messages</span>
-                        {3 > 0 && (
-                          <Badge variant="destructive" className="ml-auto">
-                            {3}
-                          </Badge>
-                        )}
-                      </div>
-                    </Link>
-                    <Link href="/notifications">
-                      <div className="flex items-center space-x-3 px-4 py-2 rounded-md hover:bg-neutral-100">
-                        <BellIcon className="h-5 w-5" />
-                        <span>Notifications</span>
-                        {5 > 0 && (
-                          <Badge variant="destructive" className="ml-auto">
-                            {5}
-                          </Badge>
-                        )}
-                      </div>
-                    </Link>
+                    </div>
                     <Link href="/profile">
-                      <div className="flex items-center space-x-3 px-4 py-2 rounded-md hover:bg-neutral-100">
-                        <UserIcon className="h-5 w-5" />
-                        <span>Profile</span>
-                      </div>
+                      <Button variant="outline" size="sm" className="mt-3 w-full text-[#0A77FF] border-[#0A77FF] hover:bg-[#0A77FF]/10">
+                        View Profile
+                      </Button>
                     </Link>
+                  </div>
+                  <div className="py-2">
+                    <NavItem 
+                      href="/" 
+                      icon={<HomeIcon className="h-5 w-5" />} 
+                      label="Home" 
+                      active={location === '/'} 
+                      isDesktop={false}
+                    />
+                    <NavItem 
+                      href="/network" 
+                      icon={<UserPlusIcon className="h-5 w-5" />} 
+                      label="My Network" 
+                      active={location === '/network'} 
+                      isDesktop={false}
+                    />
+                    <NavItem 
+                      href="/internships" 
+                      icon={<BriefcaseIcon className="h-5 w-5" />} 
+                      label="Internships" 
+                      active={location === '/internships'} 
+                      isDesktop={false}
+                    />
+                    <NavItem 
+                      href="/messaging" 
+                      icon={<MessageSquareIcon className="h-5 w-5" />} 
+                      label="Messaging" 
+                      active={location === '/messaging'} 
+                      notifications={3}
+                      isDesktop={false}
+                    />
+                    <NavItem 
+                      href="/notifications" 
+                      icon={<BellIcon className="h-5 w-5" />} 
+                      label="Notifications" 
+                      active={location === '/notifications'} 
+                      notifications={5}
+                      isDesktop={false}
+                    />
+                    <NavItem 
+                      href="/profile" 
+                      icon={<UserIcon className="h-5 w-5" />} 
+                      label="View Profile" 
+                      active={location === '/profile'} 
+                      isDesktop={false}
+                    />
+                    <NavItem 
+                      href="/cv-builder" 
+                      icon={<BookOpenIcon className="h-5 w-5" />} 
+                      label="CV Builder" 
+                      active={location === '/cv-builder'} 
+                      isDesktop={false}
+                    />
+                  </div>
+                  <div className="mt-2 pt-2 border-t">
+                    <div className="px-4 py-3 text-sm font-medium text-neutral-500">
+                      Settings & Privacy
+                    </div>
+                    <NavItem 
+                      href="/settings" 
+                      icon={<SettingsIcon className="h-5 w-5" />} 
+                      label="Settings" 
+                      active={location === '/settings'} 
+                      isDesktop={false}
+                    />
+                    <NavItem 
+                      href="/help" 
+                      icon={<HelpCircleIcon className="h-5 w-5" />} 
+                      label="Help Center" 
+                      active={location === '/help'} 
+                      isDesktop={false}
+                    />
+                    <div 
+                      className="flex items-center space-x-3 px-4 py-3 text-neutral-500 hover:text-neutral-700 cursor-pointer"
+                      onClick={logout}
+                    >
+                      <LogOutIcon className="h-5 w-5" />
+                      <span className="text-sm font-medium">Sign Out</span>
+                    </div>
                   </div>
                 </SheetContent>
               </Sheet>
@@ -161,47 +269,88 @@ const Header = () => {
           {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center space-x-2 focus:outline-none">
-                  <Avatar className="h-8 w-8">
+                <Button variant="ghost" className="flex items-center space-x-2 focus-visible:ring-[#0A77FF]">
+                  <Avatar className="h-8 w-8 border">
                     <AvatarImage 
                       src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80" 
                       alt="User profile" 
                     />
-                    <AvatarFallback>AJ</AvatarFallback>
+                    <AvatarFallback className="bg-[#0A77FF]/10 text-[#0A77FF]">AJ</AvatarFallback>
                   </Avatar>
                   {!isMobile && (
                     <>
-                      <span className="text-sm font-medium">Alex Johnson</span>
+                      <div className="flex flex-col items-start text-left">
+                        <span className="text-xs font-medium text-neutral-800">Alex Johnson</span>
+                        <span className="text-[11px] text-neutral-500">Student</span>
+                      </div>
                       <ChevronDownIcon className="h-4 w-4 text-neutral-400" />
                     </>
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuItem>
-                  <Link href="/profile">View Profile</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Link href="/cv-builder">CV Builder</Link>
-                </DropdownMenuItem>
-                {user?.role === "employer" && (
-                  <DropdownMenuItem>
-                    <Link href="/employer-dashboard">Employer Dashboard</Link>
+              <DropdownMenuContent align="end" className="w-64">
+                <div className="p-2 border-b">
+                  <div className="flex items-center space-x-3">
+                    <Avatar className="h-10 w-10 border">
+                      <AvatarImage 
+                        src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80" 
+                        alt="User profile" 
+                      />
+                      <AvatarFallback className="bg-[#0A77FF]/10 text-[#0A77FF]">AJ</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-medium">Alex Johnson</h3>
+                      <p className="text-xs text-neutral-500">Student</p>
+                    </div>
+                  </div>
+                  <Link href="/profile">
+                    <Button variant="outline" size="sm" className="mt-2 w-full text-[#0A77FF] border-[#0A77FF] hover:bg-[#0A77FF]/10">
+                      View Profile
+                    </Button>
+                  </Link>
+                </div>
+                <div className="p-1">
+                  <DropdownMenuLabel className="text-xs text-neutral-500 font-normal">Account</DropdownMenuLabel>
+                  <DropdownMenuItem className="focus:bg-[#0A77FF]/10 focus:text-[#0A77FF]">
+                    <Link href="/settings" className="flex items-center w-full">
+                      <SettingsIcon className="h-4 w-4 mr-2" />
+                      Settings & Privacy
+                    </Link>
                   </DropdownMenuItem>
-                )}
-                <DropdownMenuItem>Account Settings</DropdownMenuItem>
+                  <DropdownMenuItem className="focus:bg-[#0A77FF]/10 focus:text-[#0A77FF]">
+                    <Link href="/help" className="flex items-center w-full">
+                      <HelpCircleIcon className="h-4 w-4 mr-2" />
+                      Help Center
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="focus:bg-[#0A77FF]/10 focus:text-[#0A77FF]">
+                    <Link href="/cv-builder" className="flex items-center w-full">
+                      <BookOpenIcon className="h-4 w-4 mr-2" />
+                      CV Builder
+                    </Link>
+                  </DropdownMenuItem>
+                </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout}>Logout</DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={logout} 
+                  className="focus:bg-[#0A77FF]/10 focus:text-[#0A77FF]"
+                >
+                  <LogOutIcon className="h-4 w-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
             <div className="flex items-center space-x-2">
               <Link href="/login">
-                <Button variant="ghost" size="sm">Log In</Button>
+                <Button variant="ghost" size="sm" className="text-neutral-700 hover:text-[#0A77FF] hover:bg-[#0A77FF]/5">
+                  Log In
+                </Button>
               </Link>
               <Link href="/register">
-                <Button size="sm">Sign Up</Button>
+                <Button size="sm" className="bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white">
+                  Sign Up
+                </Button>
               </Link>
             </div>
           )}
