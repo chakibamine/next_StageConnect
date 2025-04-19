@@ -3,6 +3,8 @@ import ConversationsList from "@/components/messaging/ConversationsList";
 import ConversationView from "@/components/messaging/ConversationView";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
+import { MessageCircleIcon, UsersIcon, SearchIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 interface Message {
   id: number;
@@ -231,6 +233,7 @@ const Messaging = () => {
 
   const [activeConversationId, setActiveConversationId] = useState<number | null>(1);
   const activeConversation = conversations.find(conv => conv.id === activeConversationId) || null;
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     document.title = "Messages | StageConnect";
@@ -275,18 +278,36 @@ const Messaging = () => {
     ));
   };
 
+  // Filter conversations based on search query
+  const filteredConversations = searchQuery 
+    ? conversations.filter(conv => 
+        conv.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        conv.lastMessage.content.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : conversations;
+
+  const totalUnreadCount = conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
+
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-180px)]">
-        <div className="lg:col-span-1">
-          <ConversationsList 
-            conversations={conversations}
-            activeConversationId={activeConversationId}
-            onSelectConversation={handleSelectConversation}
-          />
+    <div className="container mx-auto px-4 py-4 md:py-6 mb-16">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-0 border rounded-lg shadow-sm overflow-hidden" style={{ height: 'calc(100vh - 160px)' }}>
+        {/* Left sidebar (conversation list) */}
+        <div className="lg:col-span-1 h-full border-r bg-white overflow-hidden flex flex-col">
+          {/* List header */}
+          
+          
+          {/* Conversation list - explicitly set height for scrolling */}
+          <div className="h-100% overflow-hidden">
+            <ConversationsList 
+              conversations={filteredConversations}
+              activeConversationId={activeConversationId}
+              onSelectConversation={handleSelectConversation}
+            />
+          </div>
         </div>
         
-        <div className="lg:col-span-2">
+        {/* Right side (conversation view) */}
+        <div className="lg:col-span-3 bg-neutral-50 h-full overflow-hidden">
           {activeConversation ? (
             <ConversationView 
               conversation={activeConversation}
@@ -294,12 +315,15 @@ const Messaging = () => {
               onSendMessage={handleSendMessage}
             />
           ) : (
-            <Card className="h-full flex items-center justify-center">
-              <CardContent className="text-center p-6">
-                <h3 className="text-lg font-medium text-neutral-700 mb-2">No conversation selected</h3>
-                <p className="text-neutral-500">Select a conversation from the list to start messaging</p>
-              </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+              <div className="bg-primary/10 rounded-full p-4 mb-4">
+                <MessageCircleIcon className="h-10 w-10 text-primary" />
+              </div>
+              <h3 className="text-lg font-medium text-neutral-700 mb-2">No conversation selected</h3>
+              <p className="text-neutral-500 max-w-md">
+                Select a conversation from the list to start messaging or connect with new contacts through the network
+              </p>
+            </div>
           )}
         </div>
       </div>

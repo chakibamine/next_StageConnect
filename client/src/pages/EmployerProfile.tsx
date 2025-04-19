@@ -29,7 +29,8 @@ import {
   CheckIcon,
   AwardIcon,
   TrophyIcon,
-  BarChartIcon
+  BarChartIcon,
+  MessageCircleIcon
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
@@ -44,6 +45,8 @@ import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { Award, Medal, Star } from "lucide-react";
 import EditItemDialog from "@/components/profile/EditItemDialog";
+import { useRoute, useLocation } from "wouter"; // Import wouter routing hooks
+import { Link } from "wouter";
 
 // Define employer profile interfaces
 interface CompanyInfo {
@@ -116,10 +119,26 @@ interface InsightItem {
   linkText: string;
 }
 
-const EmployerProfile = () => {
+// Interface for props with optional companyId
+interface EmployerProfileProps {
+  companyId?: string;
+}
+
+const EmployerProfile = (props: EmployerProfileProps) => {
+  // Get the route parameters and check if we're viewing a specific company
+  const [, params] = useRoute("/company/:id");
+  const companyId = params?.id || props.companyId;
+  const [, navigate] = useLocation();
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  
+  // Determine if this is the user's own profile
+  // For this demo, we'll set it based on URL - if we're on /company/:id route, it's not own profile
+  const [isOwnProfile, setIsOwnProfile] = useState(!companyId);
+  
+  // Add state for following
+  const [isFollowing, setIsFollowing] = useState(false);
 
   // Company profile state
   const [company, setCompany] = useState<CompanyInfo>({
@@ -450,7 +469,29 @@ const EmployerProfile = () => {
 
   useEffect(() => {
     document.title = `${company.name} | StageConnect`;
-  }, [company.name]);
+    
+    // In a real app, you would fetch the company data based on the ID
+    // and check if the current user is the owner
+    if (companyId) {
+      // Simulating fetching company data
+      console.log(`Fetching company data for ID: ${companyId}`);
+      
+      // Simple check - in a real app, you'd compare with actual user data
+      // This is just an example that assumes /profile is own profile
+      // and /company/:id is always someone else's profile
+      setIsOwnProfile(false);
+      
+      // API call would be here
+      // fetchCompanyData(companyId).then(data => {
+      //   setCompany(data);
+      //   setContactInfo(data.contactInfo);
+      //   // Compare data.ownerId with user.id to set isOwnProfile
+      // });
+    } else {
+      // No companyId means we're on the user's own profile page
+      setIsOwnProfile(true);
+    }
+  }, [companyId, company.name]);
 
   const handleAddPost = (newPost: Post) => {
     setPosts([newPost, ...posts]);
@@ -797,6 +838,28 @@ const EmployerProfile = () => {
     </AlertDialog>
   );
 
+  const handleFollow = () => {
+    setIsFollowing(!isFollowing);
+    toast({
+      title: isFollowing ? "Unfollowed" : "Following",
+      description: isFollowing 
+        ? `You are no longer following ${company.name}` 
+        : `You are now following ${company.name}`,
+    });
+  };
+
+  const handleSendMessage = () => {
+    toast({
+      title: "Message feature",
+      description: "Messaging functionality would be implemented here.",
+    });
+  };
+
+  // Function to navigate to a company profile
+  const goToCompanyProfile = (id: string) => {
+    navigate(`/company/${id}`);
+  };
+
   return (
     <div className="container mx-auto px-4 py-6">
       {isEditing ? (
@@ -845,19 +908,48 @@ const EmployerProfile = () => {
                   </div>
                 </div>
                 <div className="mt-4 md:mt-0">
-                  <Button onClick={handleStartEditing}>
-                    <PenIcon className="h-4 w-4 mr-2" /> Edit Profile
-                  </Button>
+                  {isOwnProfile ? (
+                    <Button onClick={handleStartEditing}>
+                      <PenIcon className="h-4 w-4 mr-2" /> Edit Profile
+                    </Button>
+                  ) : (
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant={isFollowing ? "outline" : "default"}
+                        onClick={handleFollow}
+                      >
+                        {isFollowing ? "Following" : "Follow"}
+                      </Button>
+                      <Button variant="outline" onClick={handleSendMessage}>
+                        <MessageCircleIcon className="h-4 w-4 mr-2" /> Message
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* Add company navigation breadcrumb when viewing profile from /company/:id */}
+          {companyId && (
+            <div className="flex items-center mb-4 text-sm breadcrumbs">
+              <ul className="flex space-x-2">
+                <li><Link href="/">Home</Link></li>
+                <li className="before:content-['/'] before:mx-2">
+                  <Link href="/network">Companies</Link>
+                </li>
+                <li className="before:content-['/'] before:mx-2">
+                  <span className="font-medium">{company.name}</span>
+                </li>
+              </ul>
+            </div>
+          )}
+          
           {/* Main Content Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-6">
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="posts">Posts</TabsTrigger>
+              {isOwnProfile && <TabsTrigger value="posts">Posts</TabsTrigger>}
               <TabsTrigger value="internships">Internships</TabsTrigger>
               <TabsTrigger value="about">About</TabsTrigger>
             </TabsList>
@@ -892,32 +984,36 @@ const EmployerProfile = () => {
                               <h3 className="font-medium">{achievement.title}</h3>
                               <p className="text-neutral-600 text-sm">{achievement.description}</p>
                             </div>
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => handleOpenEditDialog("achievement", achievement)}
-                              >
-                                <PenIcon className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                onClick={() => handleOpenDeleteDialog("achievement", achievement.id)}
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            {isOwnProfile && (
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => handleOpenEditDialog("achievement", achievement)}
+                                >
+                                  <PenIcon className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => handleOpenDeleteDialog("achievement", achievement.id)}
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         ))}
-                        <Button 
-                          variant="outline" 
-                          className="w-full mt-2" 
-                          onClick={() => handleAddItem("achievement")}
-                        >
-                          <PlusIcon className="h-4 w-4 mr-2" />
-                          Add Achievement
-                        </Button>
+                        {isOwnProfile && (
+                          <Button 
+                            variant="outline" 
+                            className="w-full mt-2" 
+                            onClick={() => handleAddItem("achievement")}
+                          >
+                            <PlusIcon className="h-4 w-4 mr-2" />
+                            Add Achievement
+                          </Button>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -925,35 +1021,39 @@ const EmployerProfile = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>Featured Projects</CardTitle>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleAddItem("project")}
-                      >
-                        <PlusIcon className="h-4 w-4 mr-2" />
-                        Add Project
-                      </Button>
+                      {isOwnProfile && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleAddItem("project")}
+                        >
+                          <PlusIcon className="h-4 w-4 mr-2" />
+                          Add Project
+                        </Button>
+                      )}
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
                         {projects.map((project) => (
                           <div key={project.id} className="border rounded-lg p-4 group relative">
-                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded p-1">
-                              <Button
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => handleOpenEditDialog("project", project)}
-                              >
-                                <PenIcon className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                onClick={() => handleOpenDeleteDialog("project", project.id)}
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            {isOwnProfile && (
+                              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded p-1">
+                                <Button
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => handleOpenEditDialog("project", project)}
+                                >
+                                  <PenIcon className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => handleOpenDeleteDialog("project", project.id)}
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
                             <h3 className="font-medium">{project.title}</h3>
                             <p className="text-neutral-600 text-sm mt-1">{project.description}</p>
                             <div className="flex gap-2 mt-2">
@@ -1056,34 +1156,38 @@ const EmployerProfile = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>Our Clients</CardTitle>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleAddItem("client")}
-                      >
-                        <PlusIcon className="h-4 w-4" />
-                      </Button>
+                      {isOwnProfile && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleAddItem("client")}
+                        >
+                          <PlusIcon className="h-4 w-4" />
+                        </Button>
+                      )}
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-2 gap-4">
                         {clients.map((client) => (
                           <div key={client.id} className="border rounded-md flex items-center justify-center p-4 h-20 group relative">
-                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded p-1">
-                              <Button
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => handleOpenEditDialog("client", client)}
-                              >
-                                <PenIcon className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                onClick={() => handleOpenDeleteDialog("client", client.id)}
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            {isOwnProfile && (
+                              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded p-1">
+                                <Button
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => handleOpenEditDialog("client", client)}
+                                >
+                                  <PenIcon className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => handleOpenDeleteDialog("client", client.id)}
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
                             <p className="font-medium text-center">{client.name}</p>
                           </div>
                         ))}
@@ -1117,12 +1221,18 @@ const EmployerProfile = () => {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
                     <CardTitle>Internship Opportunities</CardTitle>
-                    <CardDescription>Manage and showcase your current internship positions</CardDescription>
+                    <CardDescription>
+                      {isOwnProfile 
+                        ? "Manage and showcase your current internship positions" 
+                        : `Internship opportunities at ${company.name}`}
+                    </CardDescription>
                   </div>
-                  <Button onClick={handleAddInternship}>
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    Add New Internship
-                  </Button>
+                  {isOwnProfile && (
+                    <Button onClick={handleAddInternship}>
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      Add New Internship
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -1130,11 +1240,17 @@ const EmployerProfile = () => {
                       <div className="text-center py-10">
                         <BriefcaseIcon className="mx-auto h-10 w-10 text-neutral-300 mb-4" />
                         <h3 className="text-lg font-medium mb-2">No internships posted yet</h3>
-                        <p className="text-neutral-500 mb-4">Create your first internship listing to start attracting candidates.</p>
-                        <Button onClick={handleAddInternship}>
-                          <PlusIcon className="h-4 w-4 mr-2" />
-                          Create New Listing
-                        </Button>
+                        <p className="text-neutral-500 mb-4">
+                          {isOwnProfile 
+                            ? "Create your first internship listing to start attracting candidates."
+                            : `${company.name} hasn't posted any internship opportunities yet.`}
+                        </p>
+                        {isOwnProfile && (
+                          <Button onClick={handleAddInternship}>
+                            <PlusIcon className="h-4 w-4 mr-2" />
+                            Create New Listing
+                          </Button>
+                        )}
                       </div>
                     ) : (
                       internships.map((internship) => (
@@ -1159,18 +1275,37 @@ const EmployerProfile = () => {
                             <Badge variant={internship.status === "active" ? "default" : "secondary"}>
                               {internship.status === "active" ? "Active" : "Closed"}
                             </Badge>
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => handleEditInternship(internship)}>
-                                <PenIcon className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => toggleInternshipStatus(internship.id)}>
-                                {internship.status === "active" ? (
-                                  <XIcon className="h-4 w-4" />
-                                ) : (
-                                  <CheckIcon className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </div>
+                            {isOwnProfile ? (
+                              <div className="flex gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => handleEditInternship(internship)}>
+                                  <PenIcon className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => toggleInternshipStatus(internship.id)}>
+                                  {internship.status === "active" ? (
+                                    <XIcon className="h-4 w-4" />
+                                  ) : (
+                                    <CheckIcon className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            ) : (
+                              internship.status === "active" && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => {
+                                    toast({
+                                      title: "Application Started",
+                                      description: `You are applying to ${internship.title} at ${company.name}.`,
+                                    });
+                                    // In a real app, this would navigate to an application form
+                                    // navigate(`/apply/${companyId}/${internship.id}`);
+                                  }}
+                                >
+                                  Apply Now
+                                </Button>
+                              )
+                            )}
                           </div>
                         </div>
                       ))
@@ -1179,74 +1314,76 @@ const EmployerProfile = () => {
                 </CardContent>
               </Card>
 
-              {/* Stats and Metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-neutral-500">
-                      Total Applications
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="text-2xl font-bold">
-                        {internships.reduce((total, internship) => total + internship.applicants, 0)}
+              {/* Stats and Metrics - Only shown for own profile */}
+              {isOwnProfile && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-neutral-500">
+                        Total Applications
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="text-2xl font-bold">
+                          {internships.reduce((total, internship) => total + internship.applicants, 0)}
+                        </div>
+                        <div className="p-2 bg-primary/10 rounded-full">
+                          <UsersIcon className="text-primary h-5 w-5" />
+                        </div>
                       </div>
-                      <div className="p-2 bg-primary/10 rounded-full">
-                        <UsersIcon className="text-primary h-5 w-5" />
+                      <div className="text-xs text-neutral-500 mt-1">
+                        Across all internship positions
                       </div>
-                    </div>
-                    <div className="text-xs text-neutral-500 mt-1">
-                      Across all internship positions
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-neutral-500">
-                      Active Positions
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="text-2xl font-bold">
-                        {internships.filter(i => i.status === "active").length}
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-neutral-500">
+                        Active Positions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="text-2xl font-bold">
+                          {internships.filter(i => i.status === "active").length}
+                        </div>
+                        <div className="p-2 bg-primary/10 rounded-full">
+                          <BriefcaseIcon className="text-primary h-5 w-5" />
+                        </div>
                       </div>
-                      <div className="p-2 bg-primary/10 rounded-full">
-                        <BriefcaseIcon className="text-primary h-5 w-5" />
+                      <div className="text-xs text-neutral-500 mt-1">
+                        Currently accepting applications
                       </div>
-                    </div>
-                    <div className="text-xs text-neutral-500 mt-1">
-                      Currently accepting applications
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-neutral-500">
-                      Upcoming Deadlines
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="text-2xl font-bold">
-                        {internships.filter(i => 
-                          i.status === "active" && 
-                          new Date(i.deadline).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000
-                        ).length}
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-neutral-500">
+                        Upcoming Deadlines
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="text-2xl font-bold">
+                          {internships.filter(i => 
+                            i.status === "active" && 
+                            new Date(i.deadline).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000
+                          ).length}
+                        </div>
+                        <div className="p-2 bg-primary/10 rounded-full">
+                          <ClockIcon className="text-primary h-5 w-5" />
+                        </div>
                       </div>
-                      <div className="p-2 bg-primary/10 rounded-full">
-                        <ClockIcon className="text-primary h-5 w-5" />
+                      <div className="text-xs text-neutral-500 mt-1">
+                        Closing in the next 7 days
                       </div>
-                    </div>
-                    <div className="text-xs text-neutral-500 mt-1">
-                      Closing in the next 7 days
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </TabsContent>
 
             {/* About Tab - Will be expanded */}
@@ -1256,14 +1393,16 @@ const EmployerProfile = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>About {company.name}</CardTitle>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleOpenAboutDialog}
-                      >
-                        <PenIcon className="h-4 w-4 mr-2" />
-                        Edit About
-                      </Button>
+                      {isOwnProfile && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleOpenAboutDialog}
+                        >
+                          <PenIcon className="h-4 w-4 mr-2" />
+                          Edit About
+                        </Button>
+                      )}
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
@@ -1318,14 +1457,16 @@ const EmployerProfile = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>Technologies We Use</CardTitle>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleOpenTechnologiesDialog}
-                      >
-                        <PenIcon className="h-4 w-4 mr-2" />
-                        Edit
-                      </Button>
+                      {isOwnProfile && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleOpenTechnologiesDialog}
+                        >
+                          <PenIcon className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                      )}
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -1341,35 +1482,39 @@ const EmployerProfile = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>Industry Insights</CardTitle>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleAddItem("insight")}
-                      >
-                        <PlusIcon className="h-4 w-4 mr-2" />
-                        Add Insight
-                      </Button>
+                      {isOwnProfile && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAddItem("insight")}
+                        >
+                          <PlusIcon className="h-4 w-4 mr-2" />
+                          Add Insight
+                        </Button>
+                      )}
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
                         {insights.map((insight) => (
                           <div key={insight.id} className="border p-4 rounded-lg group relative">
-                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded p-1">
-                              <Button
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => handleOpenEditDialog("insight", insight)}
-                              >
-                                <PenIcon className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                onClick={() => handleOpenDeleteDialog("insight", insight.id)}
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            {isOwnProfile && (
+                              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded p-1">
+                                <Button
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => handleOpenEditDialog("insight", insight)}
+                                >
+                                  <PenIcon className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => handleOpenDeleteDialog("insight", insight.id)}
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
                             <h3 className="font-medium">{insight.title}</h3>
                             <p className="text-sm text-neutral-600 mt-1">{insight.description}</p>
                             <Button variant="link" className="px-0 h-8 mt-1">{insight.linkText}</Button>
@@ -1384,13 +1529,15 @@ const EmployerProfile = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>Company Information</CardTitle>
-                      <Button
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={handleStartEditing}
-                      >
-                        <PenIcon className="h-4 w-4" />
-                      </Button>
+                      {isOwnProfile && (
+                        <Button
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={handleStartEditing}
+                        >
+                          <PenIcon className="h-4 w-4" />
+                        </Button>
+                      )}
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div>
@@ -1426,13 +1573,15 @@ const EmployerProfile = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>Contact Information</CardTitle>
-                      <Button
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={handleStartEditing}
-                      >
-                        <PenIcon className="h-4 w-4" />
-                      </Button>
+                      {isOwnProfile && (
+                        <Button
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={handleStartEditing}
+                        >
+                          <PenIcon className="h-4 w-4" />
+                        </Button>
+                      )}
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div>
@@ -1454,13 +1603,15 @@ const EmployerProfile = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>Social Media</CardTitle>
-                      <Button
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={handleOpenSocialMediaDialog}
-                      >
-                        <PenIcon className="h-4 w-4" />
-                      </Button>
+                      {isOwnProfile && (
+                        <Button
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={handleOpenSocialMediaDialog}
+                        >
+                          <PenIcon className="h-4 w-4" />
+                        </Button>
+                      )}
                     </CardHeader>
                     <CardContent>
                       <div className="flex gap-2">
@@ -1527,13 +1678,15 @@ const EmployerProfile = () => {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>Legal Information</CardTitle>
-                      <Button
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={handleOpenLegalDialog}
-                      >
-                        <PenIcon className="h-4 w-4" />
-                      </Button>
+                      {isOwnProfile && (
+                        <Button
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={handleOpenLegalDialog}
+                        >
+                          <PenIcon className="h-4 w-4" />
+                        </Button>
+                      )}
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <div>
@@ -1924,6 +2077,125 @@ const EmployerProfile = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Add this card when viewing as a visitor */}
+      {!isOwnProfile && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Company Network</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <p className="font-medium">1,243 followers</p>
+                <p className="text-sm text-neutral-500">Including 12 people from your network</p>
+              </div>
+              <div className="flex -space-x-2 overflow-hidden">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Avatar key={i} className="border-2 border-background">
+                    <AvatarImage src={`https://i.pravatar.cc/100?img=${i+10}`} />
+                    <AvatarFallback>U{i}</AvatarFallback>
+                  </Avatar>
+                ))}
+                <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-background bg-muted text-xs font-medium">
+                  +7
+                </div>
+              </div>
+              
+              <div className="pt-3 border-t">
+                <p className="font-medium">Similar Companies</p>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <div 
+                    className="flex items-center space-x-2 border rounded-md p-2 cursor-pointer hover:bg-neutral-50"
+                    onClick={() => goToCompanyProfile('techcorp')}
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src="https://images.unsplash.com/photo-1614680376573-df3480f0c6ff?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&h=100&q=80" />
+                      <AvatarFallback>TC</AvatarFallback>
+                    </Avatar>
+                    <div className="text-sm">TechCorp</div>
+                  </div>
+                  <div 
+                    className="flex items-center space-x-2 border rounded-md p-2 cursor-pointer hover:bg-neutral-50"
+                    onClick={() => goToCompanyProfile('datasoft')}
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src="https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&h=100&q=80" />
+                      <AvatarFallback>DS</AvatarFallback>
+                    </Avatar>
+                    <div className="text-sm">DataSoft</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Add quick contact section for visitors */}
+      {!isOwnProfile && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Connect with {company.name}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <Button 
+                  className="w-[48%]" 
+                  onClick={handleFollow}
+                  variant={isFollowing ? "outline" : "default"}
+                >
+                  {isFollowing ? "Following" : "Follow"}
+                </Button>
+                <Button 
+                  className="w-[48%]" 
+                  variant="outline" 
+                  onClick={handleSendMessage}
+                >
+                  <MessageCircleIcon className="h-4 w-4 mr-2" /> 
+                  Message
+                </Button>
+              </div>
+              
+              <div className="space-y-2 py-2 border-t">
+                <p className="font-medium">Contact Information</p>
+                <div className="flex items-center space-x-2">
+                  <MailIcon className="h-4 w-4 text-neutral-500" />
+                  <span className="text-sm">{contactInfo.email}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <PhoneIcon className="h-4 w-4 text-neutral-500" />
+                  <span className="text-sm">{contactInfo.phone}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <GlobeIcon className="h-4 w-4 text-neutral-500" />
+                  <a 
+                    href={`https://${company.website}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-sm text-primary hover:underline"
+                  >
+                    {company.website}
+                  </a>
+                </div>
+              </div>
+              
+              <div className="space-y-2 pt-2 border-t">
+                <p className="font-medium">Hiring Activity</p>
+                <p className="text-sm text-neutral-600">Actively recruiting for {internships.filter(i => i.status === "active").length} positions</p>
+                <Button 
+                  variant="link" 
+                  className="px-0 text-sm h-8" 
+                  onClick={() => setActiveTab("internships")}
+                >
+                  View all internships
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

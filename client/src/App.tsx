@@ -82,6 +82,9 @@ function AppContent() {
                 </>
               )}
               
+              {/* Company profile route - accessible to all users */}
+              <Route path="/company/:id" component={EmployerProfile} />
+              
               {/* Supervisor-specific routes */}
               {user?.role === "supervisor" && (
                 <>
