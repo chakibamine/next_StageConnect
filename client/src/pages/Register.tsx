@@ -16,6 +16,7 @@ const Register = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<string>("student");
+  const [companyName, setCompanyName] = useState("");
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register } = useAuth();
@@ -33,6 +34,16 @@ const Register = () => {
       toast({
         title: "Missing information",
         description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Validate company name for employers
+    if (role === "employer" && !companyName) {
+      toast({
+        title: "Company name required",
+        description: "Please enter your company name",
         variant: "destructive",
       });
       return;
@@ -59,7 +70,16 @@ const Register = () => {
     setIsSubmitting(true);
     
     try {
-      await register(firstName, lastName, email, password, role);
+      // Call register with all necessary information
+      await register(
+        firstName, 
+        lastName, 
+        email, 
+        password, 
+        role, 
+        role === "employer" ? companyName : undefined
+      );
+      
       toast({
         title: "Account created",
         description: "Your account has been created successfully. You can now log in.",
@@ -68,27 +88,12 @@ const Register = () => {
     } catch (error) {
       toast({
         title: "Registration failed",
-        description: "An error occurred during registration. Please try again.",
+        description: error instanceof Error ? error.message : "An error occurred during registration. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // For demo purposes
-  const handleAutoRegister = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
-    // Simulate a delay
-    setTimeout(() => {
-      toast({
-        title: "Account created",
-        description: "Your account has been created successfully!",
-      });
-      navigate("/");
-    }, 800);
   };
 
   return (
@@ -111,7 +116,7 @@ const Register = () => {
             Take the first step toward your professional journey
           </p>
           
-          <form onSubmit={handleAutoRegister} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-3">
                 <Label htmlFor="firstName" className="text-sm font-medium text-neutral-700">First Name</Label>
@@ -223,6 +228,26 @@ const Register = () => {
                 </SelectContent>
               </Select>
             </div>
+            
+            {/* Company Name field - only shown if role is 'employer' */}
+            {role === 'employer' && (
+              <div className="space-y-3">
+                <Label htmlFor="companyName" className="text-sm font-medium text-neutral-700">
+                  Company Name <span className="text-red-500">*</span>
+                </Label>
+                <div className="relative">
+                  <BuildingIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-neutral-400" />
+                  <Input 
+                    id="companyName" 
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="Your company name"
+                    className="pl-10 py-6 h-11 border-neutral-300 bg-white focus-visible:ring-[#0A77FF]"
+                    required
+                  />
+                </div>
+              </div>
+            )}
             
             <div className="flex items-start space-x-3 pt-2">
               <Checkbox 

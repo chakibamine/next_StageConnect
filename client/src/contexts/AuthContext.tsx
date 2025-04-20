@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { api, getAuthHeaders } from "@/lib/api";
 
 interface User {
   id: number;
-  username: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -15,38 +15,146 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<"admin" | "student" | "supervisor" | "employer" | void>;
+  login: (email: string, password: string) => Promise<"admin" | "student" | "supervisor" | "employer" | void>;
   register: (
     firstName: string, 
     lastName: string, 
     email: string, 
     password: string, 
-    role: string
+    role: string,
+    companyName?: string
   ) => Promise<void>;
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Define response types for better type safety
+interface LoginResponse {
+  success: boolean;
+  message: string;
+  token: string;
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  userType: string;
+  companyName?: string;
+  profile?: {
+    profilePicture?: string;
+  };
+}
+
+interface RegisterResponse {
+  success: boolean;
+  message: string;
+  token?: string;
+  id?: number;
+}
+
+interface ValidateTokenResponse {
+  success: boolean;
+  message: string;
+  id?: number;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  userType?: string;
+}
+
+// Default context value with no-op functions
+const defaultContextValue: AuthContextType = {
+  user: null,
+  isAuthenticated: false,
+  isLoading: true,
+  login: async () => {},
+  register: async () => {},
+  logout: () => {}
+};
+
+const AuthContext = createContext<AuthContextType>(defaultContextValue);
+
+// Helper to safely load data from localStorage with fallbacks
+const loadFromStorage = <T extends unknown>(key: string, defaultValue: T): T => {
+  try {
+    const item = localStorage.getItem(key);
+    if (!item) return defaultValue;
+    return JSON.parse(item) as T;
+  } catch (e) {
+    console.error(`Error loading ${key} from localStorage:`, e);
+    return defaultValue;
+  }
+};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // Function to store auth data consistently
+  const saveAuthData = (token: string, userData: User) => {
+    try {
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(userData));
+      
+      // Also set in memory
+      setUser(userData);
+      setIsAuthenticated(true);
+    } catch (e) {
+      console.error("Error saving auth data to localStorage:", e);
+    }
+  };
+
+  // Function to clear auth data consistently
+  const clearAuthData = () => {
+    try {
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      
+      // Also clear from memory
+      setUser(null);
+      setIsAuthenticated(false);
+    } catch (e) {
+      console.error("Error clearing auth data from localStorage:", e);
+    }
+  };
 
   useEffect(() => {
     // Check if user is already logged in
     const checkAuth = async () => {
-      const storedUser = localStorage.getItem("user");
+      setIsLoading(true);
       
-      if (storedUser) {
+      // First, try to load user from localStorage
+      const token = localStorage.getItem("token");
+      const storedUser = loadFromStorage<User | null>("user", null);
+      
+      if (token && storedUser) {
+        // Immediately set user as authenticated from localStorage
+        setUser(storedUser);
+        setIsAuthenticated(true);
+        
+        // Validate token with backend in the background
         try {
-          const userData = JSON.parse(storedUser);
-          setUser(userData);
-          setIsAuthenticated(true);
-        } catch (error) {
-          console.error("Error parsing stored user data", error);
-          localStorage.removeItem("user");
+          console.log("Validating token with backend...");
+          const response = await api.post<ValidateTokenResponse>(
+            '/api/auth/validate-token', 
+            {}, // The token will be sent by the validateTokenWithFallback function
+            true
+          );
+          
+          // If validation fails, clear auth data and log user out
+          if (!response.success) {
+            console.warn("Token validation failed:", response.message);
+            clearAuthData();
+          } else {
+            console.log("Token validation successful");
+          }
+        } catch (validationError) {
+          // Keep the user logged in if backend validation fails
+          // This is already handled by validateTokenWithFallback
+          console.error("Token validation error (keeping session):", validationError);
         }
+      } else {
+        // No stored credentials, ensure user is logged out
+        clearAuthData();
       }
       
       setIsLoading(false);
@@ -55,66 +163,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkAuth();
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
     
     try {
-      // In production, this would make an API call
-      // For demo purposes, we simulate different user types based on username prefix
-      // student_demo, employer_demo, supervisor_demo
+      // Make real API call to backend using our API utility
+      const data = await api.post<LoginResponse>(
+        '/api/auth/login', 
+        { email, password }, 
+        false
+      );
       
-      let userRole: "student" | "employer" | "supervisor" | "admin" = "student";
-      let firstName = "Alex";
-      let lastName = "Johnson";
-      let profileImg = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80";
-      let userId = 1;
+      // Map backend userType to frontend role
+      let userRole: "admin" | "student" | "supervisor" | "employer" = "student";
       
-      if (username.startsWith("employer_")) {
+      if (data.userType === "student" || data.userType === "CANDIDATE") {
+        userRole = "student";
+      } else if (data.userType === "employer" || data.userType === "RESPONSIBLE") {
         userRole = "employer";
-        firstName = "Emily";
-        lastName = "Rodriguez";
-        profileImg = "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80";
-        userId = 2;
-      } else if (username.startsWith("supervisor_")) {
+      } else if (data.userType === "supervisor") {
         userRole = "supervisor";
-        firstName = "Michael";
-        lastName = "Chen";
-        profileImg = "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80";
-        userId = 3;
-      } else if (username.startsWith("admin_")) {
+      } else if (data.userType === "admin") {
         userRole = "admin";
-        firstName = "Sarah";
-        lastName = "Miller";
-        profileImg = "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80";
-        userId = 4;
       }
       
       const user: User = {
-        id: userId,
-        username,
-        firstName,
-        lastName,
-        email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
+        id: data.id,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
         role: userRole,
-        profilePicture: profileImg,
+        profilePicture: data.profile?.profilePicture,
       };
       
       // Add company field for employer
-      if (userRole === "employer") {
-        user.company = "TechRecruiters Inc.";
+      if (userRole === "employer" && data.companyName) {
+        user.company = data.companyName;
       }
       
-      // Store user in localStorage
-      localStorage.setItem("user", JSON.stringify(user));
-      
-      setUser(user);
-      setIsAuthenticated(true);
+      // Store token and user in localStorage using the helper function
+      saveAuthData(data.token, user);
       
       // Return the user type for immediate UI updates
       return userRole;
     } catch (error) {
       console.error("Login error", error);
-      throw new Error("Login failed");
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -125,26 +219,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     lastName: string, 
     email: string, 
     password: string, 
-    role: string
+    role: string,
+    companyName?: string
   ) => {
     setIsLoading(true);
     
     try {
-      // In a real implementation, this would make an API call
-      // For demo purposes, we'll just simulate a successful registration
-      console.log("Registration successful", { firstName, lastName, email, role });
+      // Make real API call to the register endpoint using our API utility
+      await api.post<RegisterResponse>(
+        '/api/auth/register', 
+        {
+          firstName,
+          lastName,
+          email,
+          password,
+          role, // This will be mapped to userType in the backend
+          ...(companyName && { companyName }) // Only include companyName if provided
+        }, 
+        false
+      );
+      
+      // Registration successful
+      return;
     } catch (error) {
       console.error("Registration error", error);
-      throw new Error("Registration failed");
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
   const logout = () => {
-    localStorage.removeItem("user");
-    setUser(null);
-    setIsAuthenticated(false);
+    clearAuthData();
   };
 
   return (
@@ -163,10 +269,5 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  
   return context;
 };

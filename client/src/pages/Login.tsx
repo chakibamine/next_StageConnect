@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 const Login = () => {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,10 +27,10 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!username || !password) {
+    if (!email || !password) {
       toast({
         title: "Error",
-        description: "Please enter both username and password",
+        description: "Please enter both email and password",
         variant: "destructive",
       });
       return;
@@ -39,40 +39,17 @@ const Login = () => {
     setIsSubmitting(true);
     
     try {
-      await login(username, password);
+      await login(email, password);
       navigate("/");
     } catch (error) {
       toast({
         title: "Authentication failed",
-        description: "Please check your credentials and try again",
+        description: error instanceof Error ? error.message : "Please check your credentials and try again",
         variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // For demo purposes, we'll automatically log in when clicking the login button
-  const handleAutoLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
-    let prefixedUsername = username;
-    
-    // Based on the selected role, we'll prepend the role prefix
-    if (activeRole === "student") {
-      prefixedUsername = username.startsWith("student_") ? username : "student_" + username;
-    } else if (activeRole === "employer") {
-      prefixedUsername = username.startsWith("employer_") ? username : "employer_" + username;
-    } else if (activeRole === "supervisor") {
-      prefixedUsername = username.startsWith("supervisor_") ? username : "supervisor_" + username;
-    }
-    
-    // Simulate a delay
-    setTimeout(() => {
-      login(prefixedUsername, password);
-      navigate("/");
-    }, 800);
   };
   
   // Get role-specific placeholder and information
@@ -80,21 +57,21 @@ const Login = () => {
     switch (activeRole) {
       case "student":
         return {
-          username: "student account username",
+          email: "student email address",
           description: "Find internships, build your CV, and connect with employers."
         };
       case "employer":
         return {
-          username: "employer account username",
+          email: "employer email address",
           description: "Post internships, review applications, and find talent."
         };
       case "supervisor":
         return {
-          username: "supervisor account username",
+          email: "supervisor email address",
           description: "Monitor students, internships, and review applications."
         };
       default:
-        return { username: "Your username", description: "" };
+        return { email: "Your email address", description: "" };
     }
   };
 
@@ -167,23 +144,6 @@ const Login = () => {
                 <p>
                   Sign in as a student to find internships, build your CV, and network with employers.
                 </p>
-                <div className="flex items-center mt-3 bg-[#0A77FF]/5 p-3 rounded-md border border-[#0A77FF]/20">
-                  <div className="text-[13px] font-medium text-neutral-800">
-                    <span className="block">Demo credentials:</span>
-                    <code className="text-[#0A77FF] font-mono">student_demo / password</code>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="ml-auto h-8 text-xs border-[#0A77FF] text-[#0A77FF] hover:bg-[#0A77FF]/5" 
-                    onClick={() => {
-                      setUsername("student_demo");
-                      setPassword("password");
-                    }}
-                  >
-                    Use these
-                  </Button>
-                </div>
               </div>
             </TabsContent>
             
@@ -192,23 +152,6 @@ const Login = () => {
                 <p>
                   Sign in as an employer to post internships and review applicants.
                 </p>
-                <div className="flex items-center mt-3 bg-[#0A77FF]/5 p-3 rounded-md border border-[#0A77FF]/20">
-                  <div className="text-[13px] font-medium text-neutral-800">
-                    <span className="block">Demo credentials:</span>
-                    <code className="text-[#0A77FF] font-mono">employer_demo / password</code>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="ml-auto h-8 text-xs border-[#0A77FF] text-[#0A77FF] hover:bg-[#0A77FF]/5" 
-                    onClick={() => {
-                      setUsername("employer_demo");
-                      setPassword("password");
-                    }}
-                  >
-                    Use these
-                  </Button>
-                </div>
               </div>
             </TabsContent>
             
@@ -217,38 +160,21 @@ const Login = () => {
                 <p>
                   Sign in as a supervisor to monitor students, internships, and review applications.
                 </p>
-                <div className="flex items-center mt-3 bg-[#0A77FF]/5 p-3 rounded-md border border-[#0A77FF]/20">
-                  <div className="text-[13px] font-medium text-neutral-800">
-                    <span className="block">Demo credentials:</span>
-                    <code className="text-[#0A77FF] font-mono">supervisor_demo / password</code>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="ml-auto h-8 text-xs border-[#0A77FF] text-[#0A77FF] hover:bg-[#0A77FF]/5" 
-                    onClick={() => {
-                      setUsername("supervisor_demo");
-                      setPassword("password");
-                    }}
-                  >
-                    Use these
-                  </Button>
-                </div>
               </div>
             </TabsContent>
           </Tabs>
           
-          <form onSubmit={handleAutoLogin} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-3">
-              <Label htmlFor="username" className="text-sm font-medium text-neutral-700">Username</Label>
+              <Label htmlFor="email" className="text-sm font-medium text-neutral-700">Email</Label>
               <div className="relative">
                 <MailIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-neutral-400" />
                 <Input 
-                  id="username" 
-                  type="text" 
-                  placeholder={getRolePlaceholder().username}
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  id="email" 
+                  type="email" 
+                  placeholder={getRolePlaceholder().email}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="pl-10 py-6 h-11 border-neutral-300 bg-white focus-visible:ring-[#0A77FF]"
                 />
               </div>
