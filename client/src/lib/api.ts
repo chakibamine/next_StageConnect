@@ -1,5 +1,6 @@
 // Base API URL configuration
 import type { Education, EducationFormData } from '../types/education';
+import type { Certification, CertificationFormData } from '../types/certification';
 
 const API_BASE_URL =  'http://localhost:8080';
 
@@ -330,6 +331,72 @@ export const deleteEducation = async (candidateId: number, educationId: number):
     }
   } catch (error) {
     console.error('Failed to delete education:', error);
+    throw error;
+  }
+};
+
+// Certification API endpoints
+export const getCertificationList = async (candidateId: number): Promise<Certification[]> => {
+  try {
+    const response = await fetch(apiUrl(`/api/candidates/${candidateId}/certifications`), {
+      headers: getAuthHeaders(),
+      credentials: 'include'
+    });
+    return handleApiResponse(response);
+  } catch (error) {
+    console.error('Failed to fetch certification list:', error);
+    throw new Error('Failed to fetch certification list');
+  }
+};
+
+export const createCertification = async (candidateId: number, certification: CertificationFormData): Promise<Certification> => {
+  try {
+    const response = await fetch(apiUrl(`/api/candidates/${candidateId}/certifications`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(certification),
+      credentials: 'include'
+    });
+    const result = await handleApiResponse<{ success: boolean; message: string; data: Certification }>(response);
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+    return result.data;
+  } catch (error) {
+    console.error('Failed to create certification:', error);
+    throw error;
+  }
+};
+
+export const updateCertification = async (candidateId: number, certificationId: number, certification: CertificationFormData): Promise<Certification> => {
+  try {
+    const response = await fetch(apiUrl(`/api/candidates/${candidateId}/certifications/${certificationId}`), {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(certification),
+      credentials: 'include'
+    });
+    const result = await handleApiResponse<{ success: boolean; message: string; data: Certification }>(response);
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+    return result.data;
+  } catch (error) {
+    console.error('Failed to update certification:', error);
+    throw error;
+  }
+};
+
+export const deleteCertification = async (candidateId: number, certificationId: number): Promise<void> => {
+  try {
+    const response = await fetch(apiUrl(`/api/candidates/${candidateId}/certifications/${certificationId}`), {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+      credentials: 'include'
+    });
+    await handleApiResponse(response);
+  } catch (error) {
+    console.error('Failed to delete certification:', error);
     throw error;
   }
 }; 

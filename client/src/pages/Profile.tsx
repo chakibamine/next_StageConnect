@@ -42,19 +42,11 @@ import EducationDialog from "@/components/profile/EducationDialog";
 import CertificationDialog from "@/components/profile/CertificationDialog";
 import ExperienceDialog from "@/components/profile/ExperienceDialog";
 import { useLocation } from "wouter";
-import { getEducationList, createEducation, updateEducation, deleteEducation } from '../lib/api';
+import { getEducationList, createEducation, updateEducation, deleteEducation, getCertificationList, createCertification, updateCertification, deleteCertification } from '../lib/api';
 import type { Education, EducationFormData } from '../types/education';
+import type { Certification, CertificationFormData } from '../types/certification';
 
 // Define types for our sections
-interface Certification {
-  id: number;
-  name: string;
-  issuer: string;
-  date: string;
-  credentialId: string;
-  url?: string;
-}
-
 interface Experience {
   id: number;
   title: string;
@@ -88,8 +80,9 @@ async function fetchCandidateProfile(candidateId: string) {
     const data = await response.json();
     return {
       ...data,
-      profilePicture: data.photo || null, // Map photo to profilePicture
-      education: data.education || [] // Include education data
+      profilePicture: data.photo || null,
+      education: data.education || [],
+      certifications: data.certifications || []
     };
   } catch (error) {
     console.error('Profile fetch error:', error);
@@ -297,9 +290,10 @@ const Profile = ({ id }: ProfileProps) => {
             website: data.website,
             about: data.about,
             profilePicture: data.profilePicture,
-            education: data.education // Set education from profile data
+            education: data.education
           }));
-          setEducations(data.education || []); // Update educations state
+          setEducations(data.education || []);
+          setCertifications(data.certifications || []);
         }
       });
     } else if (user) {
@@ -452,34 +446,54 @@ const Profile = ({ id }: ProfileProps) => {
     setShowCertificationDialog(true);
   };
 
-  const handleDeleteCertification = (id: number) => {
-    setCertifications(prev => prev.filter(cert => cert.id !== id));
-    toast({
-      title: "Certification deleted",
-      description: "Certification has been removed successfully."
-    });
+  const handleDeleteCertification = async (id: number) => {
+    try {
+      await deleteCertification(profile.id, id);
+      // Refresh certifications list
+      const updatedCertifications = await getCertificationList(profile.id);
+      setCertifications(updatedCertifications);
+      toast({
+        title: "Success",
+        description: "Certification deleted successfully."
+      });
+    } catch (error) {
+      console.error('Failed to delete certification:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete certification.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleSaveCertification = () => {
+  const handleSaveCertification = async () => {
     if (!tempCertification) return;
-    
-    if (editingCertification) {
-      // Update existing certification
-      setCertifications(prev => prev.map(cert => 
-        cert.id === tempCertification.id ? tempCertification : cert
-      ));
-    } else {
-      // Add new certification
-      setCertifications(prev => [...prev, { ...tempCertification, id: prev.length + 1 }]);
-    }
 
-    setShowCertificationDialog(false);
-    setEditingCertification(null);
-    setTempCertification(null);
-    toast({
-      title: "Certification updated",
-      description: "Certification has been updated successfully."
-    });
+    try {
+      let savedCertification: Certification;
+      if (editingCertification?.id) {
+        savedCertification = await updateCertification(profile.id, editingCertification.id, tempCertification);
+      } else {
+        savedCertification = await createCertification(profile.id, tempCertification);
+      }
+
+      // Refresh certifications list
+      const updatedCertifications = await getCertificationList(profile.id);
+      setCertifications(updatedCertifications);
+
+      handleCloseCertificationDialog();
+      toast({
+        title: "Success",
+        description: `Certification ${editingCertification?.id ? 'updated' : 'added'} successfully.`
+      });
+    } catch (error) {
+      console.error('Failed to save certification:', error);
+      toast({
+        title: "Error",
+        description: `Failed to ${editingCertification?.id ? 'update' : 'add'} certification.`,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleCloseCertificationDialog = () => {
