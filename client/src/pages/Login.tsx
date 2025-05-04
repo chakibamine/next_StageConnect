@@ -6,23 +6,29 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link, useLocation } from "wouter";
-import { BriefcaseIcon, GraduationCapIcon, UserIcon, BuildingIcon, ArrowRightIcon, LockIcon, MailIcon } from "lucide-react";
+import { BriefcaseIcon, ArrowRightIcon, LockIcon, MailIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => {
+    // Initialize from localStorage if available
+    const saved = localStorage.getItem("rememberMe");
+    return saved ? JSON.parse(saved) : false;
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeRole, setActiveRole] = useState("student");
   const { login } = useAuth();
   const [, navigate] = useLocation();
 
   useEffect(() => {
     document.title = "Sign In | StageConnect";
   }, []);
+
+  // Save remember me preference
+  useEffect(() => {
+    localStorage.setItem("rememberMe", JSON.stringify(rememberMe));
+  }, [rememberMe]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +45,21 @@ const Login = () => {
     setIsSubmitting(true);
     
     try {
-      await login(email, password);
+      const userRole = await login(email, password);
+      
+      // If remember me is checked, store the email
+      if (rememberMe) {
+        localStorage.setItem("rememberedEmail", email);
+      } else {
+        localStorage.removeItem("rememberedEmail");
+      }
+      
+      // Show success message
+      toast({
+        title: "Welcome back!",
+        description: `Successfully logged in as ${userRole}`,
+      });
+      
       navigate("/");
     } catch (error) {
       toast({
@@ -51,29 +71,15 @@ const Login = () => {
       setIsSubmitting(false);
     }
   };
-  
-  // Get role-specific placeholder and information
-  const getRolePlaceholder = () => {
-    switch (activeRole) {
-      case "student":
-        return {
-          email: "student email address",
-          description: "Find internships, build your CV, and connect with employers."
-        };
-      case "employer":
-        return {
-          email: "employer email address",
-          description: "Post internships, review applications, and find talent."
-        };
-      case "supervisor":
-        return {
-          email: "supervisor email address",
-          description: "Monitor students, internships, and review applications."
-        };
-      default:
-        return { email: "Your email address", description: "" };
+
+  // Load remembered email on component mount
+  useEffect(() => {
+    const rememberedEmail = localStorage.getItem("rememberedEmail");
+    if (rememberedEmail) {
+      setEmail(rememberedEmail);
+      setRememberMe(true);
     }
-  };
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-white">
@@ -95,75 +101,6 @@ const Login = () => {
             Stay connected to opportunities and your professional network
           </p>
           
-          <Tabs 
-            value={activeRole} 
-            onValueChange={setActiveRole}
-            className="w-full mb-6"
-          >
-            <TabsList className="grid grid-cols-3 w-full bg-neutral-100 p-1 rounded-xl">
-              <TabsTrigger 
-                value="student" 
-                className={cn(
-                  "flex items-center gap-2 rounded-lg text-sm",
-                  activeRole === "student" 
-                    ? "bg-white text-[#0A77FF] shadow-sm" 
-                    : "text-neutral-600 hover:text-neutral-900"
-                )}
-              >
-                <GraduationCapIcon className="h-4 w-4" />
-                <span>Student</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="employer" 
-                className={cn(
-                  "flex items-center gap-2 rounded-lg text-sm",
-                  activeRole === "employer" 
-                    ? "bg-white text-[#0A77FF] shadow-sm" 
-                    : "text-neutral-600 hover:text-neutral-900"
-                )}
-              >
-                <BuildingIcon className="h-4 w-4" />
-                <span>Employer</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="supervisor" 
-                className={cn(
-                  "flex items-center gap-2 rounded-lg text-sm",
-                  activeRole === "supervisor" 
-                    ? "bg-white text-[#0A77FF] shadow-sm" 
-                    : "text-neutral-600 hover:text-neutral-900"
-                )}
-              >
-                <UserIcon className="h-4 w-4" />
-                <span>Supervisor</span>
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="student" className="mt-6">
-              <div className="text-sm text-neutral-600 mb-6">
-                <p>
-                  Sign in as a student to find internships, build your CV, and network with employers.
-                </p>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="employer" className="mt-6">
-              <div className="text-sm text-neutral-600 mb-6">
-                <p>
-                  Sign in as an employer to post internships and review applicants.
-                </p>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="supervisor" className="mt-6">
-              <div className="text-sm text-neutral-600 mb-6">
-                <p>
-                  Sign in as a supervisor to monitor students, internships, and review applications.
-                </p>
-              </div>
-            </TabsContent>
-          </Tabs>
-          
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-3">
               <Label htmlFor="email" className="text-sm font-medium text-neutral-700">Email</Label>
@@ -172,7 +109,7 @@ const Login = () => {
                 <Input 
                   id="email" 
                   type="email" 
-                  placeholder={getRolePlaceholder().email}
+                  placeholder="Enter your email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10 py-6 h-11 border-neutral-300 bg-white focus-visible:ring-[#0A77FF]"
@@ -243,31 +180,31 @@ const Login = () => {
           <div className="space-y-6">
             <div className="flex items-start">
               <div className="bg-white/10 rounded-full p-2 mr-4">
-                <GraduationCapIcon className="h-6 w-6" />
+                <BriefcaseIcon className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="font-medium text-xl mb-1">Students</h3>
-                <p className="text-white/80">Find the perfect internship to kickstart your career and build valuable professional connections.</p>
+                <h3 className="font-medium text-xl mb-1">Connect & Collaborate</h3>
+                <p className="text-white/80">Join our platform to connect with opportunities, build your network, and advance your career.</p>
               </div>
             </div>
             
             <div className="flex items-start">
               <div className="bg-white/10 rounded-full p-2 mr-4">
-                <BuildingIcon className="h-6 w-6" />
+                <BriefcaseIcon className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="font-medium text-xl mb-1">Employers</h3>
-                <p className="text-white/80">Discover top talent for your organization and build a pipeline of future employees.</p>
+                <h3 className="font-medium text-xl mb-1">Professional Growth</h3>
+                <p className="text-white/80">Access resources, mentorship, and opportunities to grow your professional skills.</p>
               </div>
             </div>
             
             <div className="flex items-start">
               <div className="bg-white/10 rounded-full p-2 mr-4">
-                <UserIcon className="h-6 w-6" />
+                <BriefcaseIcon className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="font-medium text-xl mb-1">Supervisors</h3>
-                <p className="text-white/80">Monitor and guide the internship process to ensure successful outcomes for both students and employers.</p>
+                <h3 className="font-medium text-xl mb-1">Career Development</h3>
+                <p className="text-white/80">Take the next step in your career with our comprehensive platform.</p>
               </div>
             </div>
           </div>

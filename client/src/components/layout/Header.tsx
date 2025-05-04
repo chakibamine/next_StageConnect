@@ -4,12 +4,20 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { BriefcaseIcon, HomeIcon, UserPlusIcon, MessageSquareIcon, BellIcon, MenuIcon, ChevronDownIcon, SearchIcon, UserIcon, LogOutIcon, BookOpenIcon, SettingsIcon, HelpCircleIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import SearchBar from "@/components/ui/SearchBar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
+
+interface NavItemProps {
+  href: string;
+  icon: ReactNode;
+  label: string;
+  active?: boolean;
+  notifications?: number;
+  isDesktop?: boolean;
+}
 
 const Header = () => {
   const [location] = useLocation();
@@ -31,6 +39,75 @@ const Header = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Get user initials for avatar fallback
+  const getUserInitials = () => {
+    if (!user) return "";
+    return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+  };
+
+  // Get user display name
+  const getUserDisplayName = () => {
+    if (!user) return "";
+    return `${user.firstName} ${user.lastName}`;
+  };
+
+  // Get user role display text
+  const getUserRoleDisplay = () => {
+    if (!user) return "";
+    return user.role.charAt(0).toUpperCase() + user.role.slice(1);
+  };
+
+  // Get profile navigation items based on user role
+  const getProfileNavigationItems = () => {
+    if (!user) return [];
+    
+    const commonItems = [
+      {
+        icon: <SettingsIcon className="h-4 w-4 mr-2" />,
+        label: "Settings & Privacy",
+        href: "/settings"
+      },
+      {
+        icon: <HelpCircleIcon className="h-4 w-4 mr-2" />,
+        label: "Help Center",
+        href: "/help"
+      }
+    ];
+
+    if (user.role === "student") {
+      return [
+        {
+          icon: <BookOpenIcon className="h-4 w-4 mr-2" />,
+          label: "CV Builder",
+          href: "/cv-builder"
+        },
+        ...commonItems
+      ];
+    } else if (user.role === "employer") {
+      return [
+        {
+          icon: <BriefcaseIcon className="h-4 w-4 mr-2" />,
+          label: "Company Profile",
+          href: `/company/${user.id}`
+        },
+        {
+          icon: <UserPlusIcon className="h-4 w-4 mr-2" />,
+          label: "Manage Internships",
+          href: "/manage-internships"
+        },
+        ...commonItems
+      ];
+    }
+
+    return commonItems;
+  };
+
+  // Get profile link based on user role
+  const getProfileLink = () => {
+    if (!user) return "/profile";
+    return user.role === "employer" ? `/company/${user.id}` : `/profile/${user.id}`;
+  };
+
   const NavItem = ({ 
     href, 
     icon, 
@@ -38,14 +115,7 @@ const Header = () => {
     active, 
     notifications,
     isDesktop = true
-  }: { 
-    href: string; 
-    icon: React.ReactNode; 
-    label: string; 
-    active?: boolean;
-    notifications?: number;
-    isDesktop?: boolean;
-  }) => (
+  }: NavItemProps) => (
     <Link href={href}>
       <div className={cn(
         "flex items-center transition-all duration-200",
@@ -146,10 +216,10 @@ const Header = () => {
                   notifications={5}
                 />
                 <NavItem 
-                  href="/profile" 
+                  href={getProfileLink()} 
                   icon={<UserIcon className="h-5 w-5" />} 
                   label="Me" 
-                  active={location === '/profile'} 
+                  active={location === getProfileLink()} 
                 />
               </nav>
             ) : (
@@ -164,22 +234,25 @@ const Header = () => {
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-10 w-10 border">
                         <AvatarImage 
-                          src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80" 
-                          alt="User profile" 
+                          src={user?.profilePicture} 
+                          alt={getUserDisplayName()} 
                         />
-                        <AvatarFallback className="bg-[#0A77FF]/10 text-[#0A77FF]">AJ</AvatarFallback>
+                        <AvatarFallback className="bg-[#0A77FF]/10 text-[#0A77FF]">
+                          {getUserInitials()}
+                        </AvatarFallback>
                       </Avatar>
                       <div>
-                        <h3 className="font-medium">Alex Johnson</h3>
-                        <p className="text-xs text-neutral-500">Student</p>
+                        <h3 className="font-medium">{getUserDisplayName()}</h3>
+                        <p className="text-xs text-neutral-500">{getUserRoleDisplay()}</p>
                       </div>
                     </div>
-                    <Link href="/profile">
+                    <Link href={getProfileLink()}>
                       <Button variant="outline" size="sm" className="mt-3 w-full text-[#0A77FF] border-[#0A77FF] hover:bg-[#0A77FF]/10">
                         View Profile
                       </Button>
                     </Link>
                   </div>
+                  
                   <div className="py-2">
                     <NavItem 
                       href="/" 
@@ -219,38 +292,26 @@ const Header = () => {
                       isDesktop={false}
                     />
                     <NavItem 
-                      href="/profile" 
+                      href={getProfileLink()} 
                       icon={<UserIcon className="h-5 w-5" />} 
                       label="View Profile" 
-                      active={location === '/profile'} 
-                      isDesktop={false}
-                    />
-                    <NavItem 
-                      href="/cv-builder" 
-                      icon={<BookOpenIcon className="h-5 w-5" />} 
-                      label="CV Builder" 
-                      active={location === '/cv-builder'} 
+                      active={location === getProfileLink()} 
                       isDesktop={false}
                     />
                   </div>
+                  
                   <div className="mt-2 pt-2 border-t">
                     <div className="px-4 py-3 text-sm font-medium text-neutral-500">
                       Settings & Privacy
                     </div>
-                    <NavItem 
-                      href="/settings" 
-                      icon={<SettingsIcon className="h-5 w-5" />} 
-                      label="Settings" 
-                      active={location === '/settings'} 
-                      isDesktop={false}
-                    />
-                    <NavItem 
-                      href="/help" 
-                      icon={<HelpCircleIcon className="h-5 w-5" />} 
-                      label="Help Center" 
-                      active={location === '/help'} 
-                      isDesktop={false}
-                    />
+                    {getProfileNavigationItems().map((item, index) => (
+                      <Link key={index} href={item.href}>
+                        <div className="flex items-center space-x-3 px-4 py-3 text-neutral-500 hover:text-neutral-700 cursor-pointer">
+                          {item.icon}
+                          <span className="text-sm font-medium">{item.label}</span>
+                        </div>
+                      </Link>
+                    ))}
                     <div 
                       className="flex items-center space-x-3 px-4 py-3 text-neutral-500 hover:text-neutral-700 cursor-pointer"
                       onClick={logout}
@@ -265,73 +326,67 @@ const Header = () => {
           </>
         )}
         
-        <div className="flex items-center">
-          {isAuthenticated ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center space-x-2 focus-visible:ring-[#0A77FF]">
-                  <Avatar className="h-8 w-8 border">
-                    <AvatarImage 
-                      src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80" 
-                      alt="User profile" 
-                    />
-                    <AvatarFallback className="bg-[#0A77FF]/10 text-[#0A77FF]">AJ</AvatarFallback>
-                  </Avatar>
-                  {!isMobile && (
-                    <>
-                      <div className="flex flex-col items-start text-left">
-                        <span className="text-xs font-medium text-neutral-800">Alex Johnson</span>
-                        <span className="text-[11px] text-neutral-500">Student</span>
-                      </div>
-                      <ChevronDownIcon className="h-4 w-4 text-neutral-400" />
-                    </>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <div className="p-2 border-b">
-                  <div className="flex items-center space-x-3">
-                    <Avatar className="h-10 w-10 border">
-                      <AvatarImage 
-                        src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80" 
-                        alt="User profile" 
-                      />
-                      <AvatarFallback className="bg-[#0A77FF]/10 text-[#0A77FF]">AJ</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h3 className="font-medium">Alex Johnson</h3>
-                      <p className="text-xs text-neutral-500">Student</p>
+        {isAuthenticated ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="flex items-center space-x-2 focus-visible:ring-[#0A77FF]">
+                <Avatar className="h-8 w-8 border">
+                  <AvatarImage 
+                    src={user?.profilePicture} 
+                    alt={getUserDisplayName()} 
+                  />
+                  <AvatarFallback className="bg-[#0A77FF]/10 text-[#0A77FF]">
+                    {getUserInitials()}
+                  </AvatarFallback>
+                </Avatar>
+                {!isMobile && (
+                  <>
+                    <div className="flex flex-col items-start text-left">
+                      <span className="text-xs font-medium text-neutral-800">{getUserDisplayName()}</span>
+                      <span className="text-[11px] text-neutral-500">{getUserRoleDisplay()}</span>
                     </div>
+                    <ChevronDownIcon className="h-4 w-4 text-neutral-400" />
+                  </>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56">
+              <div className="p-2 border-b">
+                <div className="flex items-center space-x-3">
+                  <Avatar className="h-10 w-10 border">
+                    <AvatarImage 
+                      src={user?.profilePicture} 
+                      alt={getUserDisplayName()} 
+                    />
+                    <AvatarFallback className="bg-[#0A77FF]/10 text-[#0A77FF]">
+                      {getUserInitials()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="font-medium">{getUserDisplayName()}</h3>
+                    <p className="text-xs text-neutral-500">{getUserRoleDisplay()}</p>
                   </div>
-                  <Link href="/profile">
-                    <Button variant="outline" size="sm" className="mt-2 w-full text-[#0A77FF] border-[#0A77FF] hover:bg-[#0A77FF]/10">
-                      View Profile
-                    </Button>
-                  </Link>
                 </div>
-                <div className="p-1">
-                  <DropdownMenuLabel className="text-xs text-neutral-500 font-normal">Account</DropdownMenuLabel>
-                  <DropdownMenuItem className="focus:bg-[#0A77FF]/10 focus:text-[#0A77FF]">
-                    <Link href="/settings" className="flex items-center w-full">
-                      <SettingsIcon className="h-4 w-4 mr-2" />
-                      Settings & Privacy
+                <Link href={getProfileLink()}>
+                  <Button variant="outline" size="sm" className="mt-2 w-full text-[#0A77FF] border-[#0A77FF] hover:bg-[#0A77FF]/10">
+                    View Profile
+                  </Button>
+                </Link>
+              </div>
+              
+              <div className="py-1">
+                <DropdownMenuLabel className="text-xs text-neutral-500 font-normal">Account</DropdownMenuLabel>
+                {getProfileNavigationItems().map((item, index) => (
+                  <DropdownMenuItem key={index} className="focus:bg-[#0A77FF]/10 focus:text-[#0A77FF]">
+                    <Link href={item.href} className="flex items-center w-full">
+                      {item.icon}
+                      {item.label}
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="focus:bg-[#0A77FF]/10 focus:text-[#0A77FF]">
-                    <Link href="/help" className="flex items-center w-full">
-                      <HelpCircleIcon className="h-4 w-4 mr-2" />
-                      Help Center
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="focus:bg-[#0A77FF]/10 focus:text-[#0A77FF]">
-                    <Link href="/cv-builder" className="flex items-center w-full">
-                      <BookOpenIcon className="h-4 w-4 mr-2" />
-                      CV Builder
-                    </Link>
-                  </DropdownMenuItem>
-                </div>
-                <DropdownMenuSeparator />
-                <Link href="/login">
+                ))}
+              </div>
+              <DropdownMenuSeparator />
+              <Link href="/login">
                 <DropdownMenuItem 
                   onClick={logout} 
                   className="focus:bg-[#0A77FF]/10 focus:text-[#0A77FF]"
@@ -339,24 +394,23 @@ const Header = () => {
                   <LogOutIcon className="h-4 w-4 mr-2" />
                   Sign Out
                 </DropdownMenuItem>
-                </Link>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <div className="flex items-center space-x-2">
-              <Link href="/login">
-                <Button variant="ghost" size="sm" className="text-neutral-700 hover:text-[#0A77FF] hover:bg-[#0A77FF]/5">
-                  Log In
-                </Button>
               </Link>
-              <Link href="/register">
-                <Button size="sm" className="bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white">
-                  Sign Up
-                </Button>
-              </Link>
-            </div>
-          )}
-        </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <div className="flex items-center space-x-2">
+            <Link href="/login">
+              <Button variant="ghost" size="sm" className="text-neutral-700 hover:text-[#0A77FF] hover:bg-[#0A77FF]/5">
+                Log In
+              </Button>
+            </Link>
+            <Link href="/register">
+              <Button size="sm" className="bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white">
+                Sign Up
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
     </header>
   );

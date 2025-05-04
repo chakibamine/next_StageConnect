@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-interface ProfileData {
+export interface ProfileData {
+  id: number;
   firstName: string;
   lastName: string;
   email: string;

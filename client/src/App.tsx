@@ -84,6 +84,34 @@ const ProtectedRoute = ({ component: Component, requiredRole, ...rest }: {
   return <Component {...rest} />;
 };
 
+// Profile route component that handles both viewing and editing
+const ProfileRoute = ({ id }: { id?: string }) => {
+  const { user, isAuthenticated } = useAuth();
+  
+  // If no ID is provided, show the current user's profile
+  if (!id) {
+    return <Profile isEditable={true} />;
+  }
+  
+  // If ID is provided, show the profile in view mode
+  // The Profile component will handle the connection logic
+  return <Profile id={id} isEditable={false} />;
+};
+
+// Employer profile route component that handles both viewing and editing
+const EmployerProfileRoute = ({ id }: { id?: string }) => {
+  const { user, isAuthenticated } = useAuth();
+  
+  // If no ID is provided, show the current user's profile
+  if (!id) {
+    return <EmployerProfile isEditable={true} />;
+  }
+  
+  // If ID is provided, show the profile in view mode
+  // The EmployerProfile component will handle the connection logic
+  return <EmployerProfile id={id} isEditable={false} />;
+};
+
 // Home route that redirects based on authentication state and user role
 const HomeRoute = () => {
   const { isAuthenticated, user, isLoading } = useAuth();
@@ -172,7 +200,34 @@ function AppContent() {
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
           
-          {/* Student-specific routes */}
+          {/* Common routes for all authenticated users */}
+          {isAuthenticated && (
+            <>
+              {/* Profile routes - accessible to all authenticated users */}
+              <Route path="/profile">
+                <ProtectedRoute component={ProfileRoute} />
+              </Route>
+              <Route path="/profile/:id">
+                {(params) => <ProtectedRoute component={ProfileRoute} id={params.id} />}
+              </Route>
+              <Route path="/company/:id">
+                {(params) => <ProtectedRoute component={EmployerProfile} id={params.id} />}
+              </Route>
+              
+              {/* Common features */}
+              <Route path="/messaging">
+                <ProtectedRoute component={Messaging} />
+              </Route>
+              <Route path="/notifications">
+                <ProtectedRoute component={Notifications} />
+              </Route>
+              <Route path="/network">
+                <ProtectedRoute component={Network} />
+              </Route>
+            </>
+          )}
+          
+          {/* Role-specific routes */}
           {isAuthenticated && userRole === "student" && (
             <>
               <Route path="/dashboard">
@@ -184,65 +239,24 @@ function AppContent() {
               <Route path="/internships/:id">
                 {(params) => <ProtectedRoute component={InternshipDetail} id={params.id} />}
               </Route>
-              <Route path="/network">
-                <ProtectedRoute component={Network} />
-              </Route>
               <Route path="/cv-builder">
                 <ProtectedRoute component={CVBuilder} requiredRole="student" />
-              </Route>
-              <Route path="/profile">
-                <ProtectedRoute component={Profile} />
               </Route>
             </>
           )}
           
-          {/* Employer-specific routes */}
           {isAuthenticated && userRole === "employer" && (
             <>
               <Route path="/employer-dashboard">
                 <ProtectedRoute component={EmployerDashboard} requiredRole="employer" />
               </Route>
-              <Route path="/profile">
-                <ProtectedRoute component={EmployerProfile} />
-              </Route>
-              <Route path="/network">
-                <ProtectedRoute component={Network} />
-              </Route>
-              <Route path="/internships">
-                <ProtectedRoute component={Internships} />
-              </Route>
-              <Route path="/internships/:id">
-                {(params) => <ProtectedRoute component={InternshipDetail} id={params.id} />}
-              </Route>
             </>
           )}
           
-          {/* Supervisor-specific routes */}
           {isAuthenticated && userRole === "supervisor" && (
             <>
               <Route path="/supervisor-dashboard">
                 <ProtectedRoute component={SupervisorDashboard} requiredRole="supervisor" />
-              </Route>
-              <Route path="/profile">
-                <ProtectedRoute component={Profile} />
-              </Route>
-              <Route path="/network">
-                <ProtectedRoute component={Network} />
-              </Route>
-            </>
-          )}
-          
-          {/* Common routes for all authenticated users */}
-          {isAuthenticated && (
-            <>
-              <Route path="/messaging">
-                <ProtectedRoute component={Messaging} />
-              </Route>
-              <Route path="/notifications">
-                <ProtectedRoute component={Notifications} />
-              </Route>
-              <Route path="/company/:id">
-                {(params) => <ProtectedRoute component={EmployerProfile} id={params.id} />}
               </Route>
             </>
           )}

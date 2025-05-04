@@ -92,11 +92,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Function to store auth data consistently
   const saveAuthData = (token: string, userData: User) => {
     try {
+      // Store token
       localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(userData));
+      
+      // Store user data with additional information
+      const userDataToStore = {
+        ...userData,
+        fullName: `${userData.firstName} ${userData.lastName}`,
+        lastLogin: new Date().toISOString()
+      };
+      localStorage.setItem("user", JSON.stringify(userDataToStore));
       
       // Also set in memory
-      setUser(userData);
+      setUser(userDataToStore);
       setIsAuthenticated(true);
     } catch (e) {
       console.error("Error saving auth data to localStorage:", e);
@@ -106,8 +114,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Function to clear auth data consistently
   const clearAuthData = () => {
     try {
-      localStorage.removeItem("user");
+      // Remove all auth-related data
       localStorage.removeItem("token");
+      localStorage.removeItem("user");
       
       // Also clear from memory
       setUser(null);

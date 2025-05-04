@@ -121,21 +121,21 @@ interface InsightItem {
 
 // Interface for props with optional companyId
 interface EmployerProfileProps {
+  id?: string;
+  isEditable?: boolean;
   companyId?: string;
 }
 
-const EmployerProfile = (props: EmployerProfileProps) => {
-  // Get the route parameters and check if we're viewing a specific company
+const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfileProps) => {
   const [, params] = useRoute("/company/:id");
-  const companyId = params?.id || props.companyId;
+  const profileId = id || params?.id || companyId;
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   
   // Determine if this is the user's own profile
-  // For this demo, we'll set it based on URL - if we're on /company/:id route, it's not own profile
-  const [isOwnProfile, setIsOwnProfile] = useState(!companyId);
+  const [isOwnProfile, setIsOwnProfile] = useState(false);
   
   // Add state for following
   const [isFollowing, setIsFollowing] = useState(false);
@@ -470,28 +470,33 @@ const EmployerProfile = (props: EmployerProfileProps) => {
   useEffect(() => {
     document.title = `${company.name} | StageConnect`;
     
-    // In a real app, you would fetch the company data based on the ID
-    // and check if the current user is the owner
-    if (companyId) {
-      // Simulating fetching company data
-      console.log(`Fetching company data for ID: ${companyId}`);
-      
-      // Simple check - in a real app, you'd compare with actual user data
-      // This is just an example that assumes /profile is own profile
-      // and /company/:id is always someone else's profile
-      setIsOwnProfile(false);
-      
-      // API call would be here
-      // fetchCompanyData(companyId).then(data => {
+    // If we have a profile ID, fetch the company data
+    if (profileId) {
+      // TODO: Fetch company data for the specified ID
+      console.log(`Fetching company data for ID: ${profileId}`);
+      // fetchCompanyData(profileId).then(data => {
       //   setCompany(data);
       //   setContactInfo(data.contactInfo);
       //   // Compare data.ownerId with user.id to set isOwnProfile
+      //   setIsOwnProfile(data.ownerId === user?.id);
       // });
+      
+      // Set isOwnProfile based on whether the current user owns this company
+      const parsedProfileId = parseInt(profileId);
+      setIsOwnProfile(user?.id === parsedProfileId);
     } else {
-      // No companyId means we're on the user's own profile page
+      // No ID means we're viewing our own profile
       setIsOwnProfile(true);
+      if (user) {
+        // Use the authenticated user's company data
+        setCompany({
+          ...company,
+          name: user.company || company.name,
+          // ... other company fields
+        });
+      }
     }
-  }, [companyId, company.name]);
+  }, [profileId, user, company.name]);
 
   const handleAddPost = (newPost: Post) => {
     setPosts([newPost, ...posts]);
@@ -860,9 +865,34 @@ const EmployerProfile = (props: EmployerProfileProps) => {
     navigate(`/company/${id}`);
   };
 
+  // Update the handleConnect function to use parseInt
+  const handleConnect = async (profileId: string) => {
+    try {
+      const parsedProfileId = parseInt(profileId);
+      // Implement connection logic here
+      toast({
+        title: "Connection Request Sent",
+        description: "Your connection request has been sent successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send connection request. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Update the handleMessage function to use parseInt
+  const handleMessage = (profileId: string) => {
+    const parsedProfileId = parseInt(profileId);
+    // Navigate to messaging page with the selected user
+    navigate(`/messaging?user=${parsedProfileId}`);
+  };
+
   return (
     <div className="container mx-auto px-4 py-6">
-      {isEditing ? (
+      {isEditing && isOwnProfile ? (
         <CompanyProfileEditForm 
           tempCompany={tempCompany}
           setTempCompany={setTempCompany}
@@ -900,15 +930,16 @@ const EmployerProfile = (props: EmployerProfileProps) => {
                     {company.website && (
                       <div className="flex items-center">
                         <GlobeIcon className="h-4 w-4 mr-1" />
-                        <a href={`https://${company.website}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        <a href={`https://${company.website}`} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
                           {company.website}
                         </a>
                       </div>
                     )}
                   </div>
                 </div>
+                
                 <div className="mt-4 md:mt-0">
-                  {isOwnProfile ? (
+                  {isEditable ? (
                     <Button onClick={handleStartEditing}>
                       <PenIcon className="h-4 w-4 mr-2" /> Edit Profile
                     </Button>
@@ -931,7 +962,7 @@ const EmployerProfile = (props: EmployerProfileProps) => {
           </Card>
 
           {/* Add company navigation breadcrumb when viewing profile from /company/:id */}
-          {companyId && (
+          {profileId && (
             <div className="flex items-center mb-4 text-sm breadcrumbs">
               <ul className="flex space-x-2">
                 <li><Link href="/">Home</Link></li>
@@ -946,10 +977,10 @@ const EmployerProfile = (props: EmployerProfileProps) => {
           )}
           
           {/* Main Content Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs defaultValue="overview">
             <TabsList className="mb-6">
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              {isOwnProfile && <TabsTrigger value="posts">Posts</TabsTrigger>}
+              {isEditable && <TabsTrigger value="posts">Posts</TabsTrigger>}
               <TabsTrigger value="internships">Internships</TabsTrigger>
               <TabsTrigger value="about">About</TabsTrigger>
             </TabsList>
@@ -1017,7 +1048,6 @@ const EmployerProfile = (props: EmployerProfileProps) => {
                       </div>
                     </CardContent>
                   </Card>
-                  
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>Featured Projects</CardTitle>

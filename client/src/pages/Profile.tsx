@@ -25,7 +25,8 @@ import {
   FileDownIcon,
   EyeIcon,
   TrashIcon,
-  XIcon
+  XIcon,
+  MessageCircleIcon
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
@@ -36,10 +37,11 @@ import { Post } from "@shared/schema";
 import CVGenerator from "@/components/cv/CVGenerator";
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import ProfileEditForm from "@/components/profile/ProfileEditForm";
+import ProfileEditForm, { ProfileData } from "@/components/profile/ProfileEditForm";
 import EducationDialog from "@/components/profile/EducationDialog";
 import CertificationDialog from "@/components/profile/CertificationDialog";
 import ExperienceDialog from "@/components/profile/ExperienceDialog";
+import { useLocation } from "wouter";
 
 // Define types for our sections
 interface Education {
@@ -70,9 +72,14 @@ interface Experience {
   description: string;
 }
 
-const Profile = () => {
+interface ProfileProps {
+  id?: string;
+}
+
+const Profile = ({ id }: ProfileProps) => {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const [posts, setPosts] = useState<Post[]>([
     {
       id: 1,
@@ -108,7 +115,8 @@ const Profile = () => {
   const [tempExperience, setTempExperience] = useState<Experience | null>(null);
 
   // Profile state
-  const [profile, setProfile] = useState({
+  const [profile, setProfile] = useState<ProfileData>({
+    id: 0,
     firstName: "Alex",
     lastName: "Johnson",
     email: "alex.johnson@email.com",
@@ -199,9 +207,49 @@ const Profile = () => {
   // Define state for profile editing form
   const [tempProfile, setTempProfile] = useState({...profile});
 
+  const [, navigate] = useLocation();
+
   useEffect(() => {
     document.title = `${profile.firstName} ${profile.lastName} | StageConnect`;
   }, [profile.firstName, profile.lastName]);
+
+  useEffect(() => {
+    // If we have an ID, fetch the profile data for that user
+    if (id) {
+      // TODO: Fetch profile data for the specified user ID
+      console.log(`Fetching profile data for user ID: ${id}`);
+      // fetchProfileData(id).then(data => {
+      //   setProfile(data);
+      //   setCertifications(data.certifications);
+      //   setExperiences(data.experiences);
+      // });
+    } else {
+      // No ID means we're viewing our own profile
+      // Use the authenticated user's data
+      if (user) {
+        setProfile({
+          ...profile,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          // ... other profile fields
+        });
+      }
+    }
+  }, [id, user]);
+
+  useEffect(() => {
+    if (user && id) {
+      // If we have both user and id, compare them
+      setIsOwner(user.id === parseInt(id));
+    } else if (user && !id) {
+      // If no id is provided, it means we're viewing our own profile
+      setIsOwner(true);
+    } else {
+      // If no user or different user, not the owner
+      setIsOwner(false);
+    }
+  }, [user, id]);
 
   const handleProfileUpdate = () => {
     setProfile(tempProfile);
@@ -243,15 +291,15 @@ const Profile = () => {
 
   const handleEditEducation = (edu: Education) => {
     setEditingEducation(edu);
-    setTempEducation({...edu});
+    setTempEducation(edu);
     setShowEducationDialog(true);
   };
 
   const handleDeleteEducation = (id: number) => {
-    setProfile({
-      ...profile,
-      education: profile.education.filter(edu => edu.id !== id)
-    });
+    setProfile(prev => ({
+      ...prev,
+      education: prev.education.filter(edu => edu.id !== id)
+    }));
     toast({
       title: "Education deleted",
       description: "Education entry has been removed successfully."
@@ -261,31 +309,29 @@ const Profile = () => {
   const handleSaveEducation = () => {
     if (!tempEducation) return;
     
-    if (tempEducation.id === 0) {
-      // Add new education
-      const newId = Math.max(0, ...profile.education.map(e => e.id)) + 1;
-      setProfile({
-        ...profile,
-        education: [...profile.education, { ...tempEducation, id: newId }]
-      });
-      toast({
-        title: "Education added",
-        description: "New education entry has been added successfully."
-      });
-    } else {
+    if (editingEducation) {
       // Update existing education
-      setProfile({
-        ...profile,
-        education: profile.education.map(e => e.id === tempEducation.id ? tempEducation : e)
-      });
-      toast({
-        title: "Education updated",
-        description: "Education entry has been updated successfully."
-      });
+      setProfile(prev => ({
+        ...prev,
+        education: prev.education.map(edu => 
+          edu.id === tempEducation.id ? tempEducation : edu
+        )
+      }));
+    } else {
+      // Add new education
+      setProfile(prev => ({
+        ...prev,
+        education: [...prev.education, { ...tempEducation, id: prev.education.length + 1 }]
+      }));
     }
+
     setShowEducationDialog(false);
     setEditingEducation(null);
     setTempEducation(null);
+    toast({
+      title: "Education updated",
+      description: "Education entry has been updated successfully."
+    });
   };
 
   const handleCloseEducationDialog = () => {
@@ -296,27 +342,26 @@ const Profile = () => {
 
   // Certification handlers
   const handleAddCertification = () => {
-    const newCertification = {
+    setEditingCertification(null);
+    setTempCertification({
       id: 0,
       name: "",
       issuer: "",
       date: "",
       credentialId: "",
       url: ""
-    };
-    setEditingCertification(newCertification);
-    setTempCertification(newCertification);
+    });
     setShowCertificationDialog(true);
   };
 
   const handleEditCertification = (cert: Certification) => {
     setEditingCertification(cert);
-    setTempCertification({...cert});
+    setTempCertification(cert);
     setShowCertificationDialog(true);
   };
 
   const handleDeleteCertification = (id: number) => {
-    setCertifications(certifications.filter(cert => cert.id !== id));
+    setCertifications(prev => prev.filter(cert => cert.id !== id));
     toast({
       title: "Certification deleted",
       description: "Certification has been removed successfully."
@@ -326,25 +371,23 @@ const Profile = () => {
   const handleSaveCertification = () => {
     if (!tempCertification) return;
     
-    if (tempCertification.id === 0) {
-      // Add new certification
-      const newId = Math.max(0, ...certifications.map(c => c.id)) + 1;
-      setCertifications([...certifications, { ...tempCertification, id: newId }]);
-      toast({
-        title: "Certification added",
-        description: "New certification has been added successfully."
-      });
-    } else {
+    if (editingCertification) {
       // Update existing certification
-      setCertifications(certifications.map(c => c.id === tempCertification.id ? tempCertification : c));
-      toast({
-        title: "Certification updated",
-        description: "Certification has been updated successfully."
-      });
+      setCertifications(prev => prev.map(cert => 
+        cert.id === tempCertification.id ? tempCertification : cert
+      ));
+    } else {
+      // Add new certification
+      setCertifications(prev => [...prev, { ...tempCertification, id: prev.length + 1 }]);
     }
+
     setShowCertificationDialog(false);
     setEditingCertification(null);
     setTempCertification(null);
+    toast({
+      title: "Certification updated",
+      description: "Certification has been updated successfully."
+    });
   };
 
   const handleCloseCertificationDialog = () => {
@@ -355,7 +398,8 @@ const Profile = () => {
 
   // Experience handlers
   const handleAddExperience = () => {
-    const newExperience = {
+    setEditingExperience(null);
+    setTempExperience({
       id: 0,
       title: "",
       company: "",
@@ -363,45 +407,45 @@ const Profile = () => {
       startDate: "",
       endDate: "",
       description: ""
-    };
-    setEditingExperience(newExperience);
-    setTempExperience(newExperience);
+    });
     setShowExperienceDialog(true);
   };
 
   const handleEditExperience = (exp: Experience) => {
     setEditingExperience(exp);
-    setTempExperience({...exp});
+    setTempExperience(exp);
     setShowExperienceDialog(true);
   };
 
   const handleDeleteExperience = (id: number) => {
-    setExperiences(experiences.filter(exp => exp.id !== id));
+    setExperiences(prev => prev.filter(exp => exp.id !== id));
     toast({
       title: "Experience deleted",
-      description: "Experience has been removed successfully."
+      description: "Experience has been deleted successfully."
     });
   };
 
   const handleSaveExperience = () => {
     if (!tempExperience) return;
     
-    if (tempExperience.id === 0) {
-      // Add new experience
-      const newId = Math.max(0, ...experiences.map(e => e.id)) + 1;
-      setExperiences([...experiences, { ...tempExperience, id: newId }]);
-      toast({
-        title: "Experience added",
-        description: "New experience has been added successfully."
-      });
-    } else {
+    if (editingExperience) {
       // Update existing experience
-      setExperiences(experiences.map(e => e.id === tempExperience.id ? tempExperience : e));
+      setExperiences(prev => prev.map(exp => 
+        exp.id === tempExperience.id ? tempExperience : exp
+      ));
       toast({
         title: "Experience updated",
         description: "Experience has been updated successfully."
       });
+    } else {
+      // Add new experience
+      setExperiences(prev => [...prev, { ...tempExperience, id: prev.length + 1 }]);
+      toast({
+        title: "Experience added",
+        description: "New experience has been added successfully."
+      });
     }
+
     setShowExperienceDialog(false);
     setEditingExperience(null);
     setTempExperience(null);
@@ -432,10 +476,32 @@ const Profile = () => {
     experiences: experiences
   };
 
+  const handleConnect = async (profileId: string) => {
+    try {
+      const parsedProfileId = parseInt(profileId);
+      // Implement connection logic here
+      toast({
+        title: "Connection Request Sent",
+        description: "Your connection request has been sent successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send connection request. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMessage = (profileId: string) => {
+    const parsedProfileId = parseInt(profileId);
+    // Navigate to messaging page with the selected user
+    navigate(`/messaging?user=${parsedProfileId}`);
+  };
   
   return (
     <div className="container mx-auto px-4 py-6">
-      {isEditing ? (
+      {isEditing && isOwner ? (
         <ProfileEditForm 
           tempProfile={tempProfile}
           setTempProfile={setTempProfile}
@@ -443,8 +509,9 @@ const Profile = () => {
           handleProfileUpdate={handleProfileUpdate}
         />
       ) : (
-        <div className="mb-6">
-          <Card className="overflow-hidden">
+        <>
+          {/* Profile Header */}
+          <Card className="mb-6 overflow-hidden">
             <div className="h-32 bg-gradient-to-r from-primary-500 to-purple-500"></div>
             <CardContent className="relative">
               <div className="absolute -top-16 left-4 md:left-8">
@@ -477,15 +544,27 @@ const Profile = () => {
                     )}
                   </div>
                 </div>
+                
                 <div className="mt-4 md:mt-0">
-                  <Button onClick={handleStartEditing}>
-                    <PenIcon className="h-4 w-4 mr-2" /> Edit Profile
-                  </Button>
+                  {isOwner ? (
+                    <Button onClick={handleStartEditing}>
+                      <PenIcon className="h-4 w-4 mr-2" /> Edit Profile
+                    </Button>
+                  ) : (
+                    <div className="flex space-x-2">
+                      <Button variant="outline" onClick={() => handleConnect(profile.id.toString())}>
+                        <UserPlusIcon className="h-4 w-4 mr-2" /> Connect
+                      </Button>
+                      <Button variant="outline" onClick={() => handleMessage(profile.id.toString())}>
+                        <MessageCircleIcon className="h-4 w-4 mr-2" /> Message
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
-        </div>
+        </>
       )}
       
       <div className="w-full">
@@ -501,14 +580,14 @@ const Profile = () => {
           
           <TabsContent value="posts">
             <div className="space-y-4">
-              <CreatePost onAddPost={handleAddPost} />
+              {isOwner && <CreatePost onAddPost={handleAddPost} />}
               {posts.map((post) => (
                 <PostCard key={post.id} post={post} />
               ))}
               {posts.length === 0 && (
                 <Card>
                   <CardContent className="p-6 text-center">
-                    <p className="text-neutral-500">You haven't posted anything yet. Share your first post!</p>
+                    <p className="text-neutral-500">No posts yet.</p>
                   </CardContent>
                 </Card>
               )}
@@ -519,9 +598,11 @@ const Profile = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg font-semibold">Education</CardTitle>
+                {isOwner && (
                 <Button size="sm" variant="outline" onClick={handleAddEducation}>
                   <PlusIcon className="h-4 w-4 mr-1" /> Add
                 </Button>
+                )}
               </CardHeader>
               <CardContent className="space-y-4">
                 {profile.education.map((edu) => (
@@ -538,6 +619,7 @@ const Profile = () => {
                           <p className="mt-2 text-sm text-neutral-600">{edu.description}</p>
                         )}
                       </div>
+                      {isOwner && (
                       <div className="flex space-x-2">
                         <Button 
                           size="sm" 
@@ -554,16 +636,18 @@ const Profile = () => {
                           <TrashIcon className="h-4 w-4 text-red-500" />
                         </Button>
                       </div>
+                      )}
                     </div>
                   </div>
                 ))}
                 {profile.education.length === 0 && (
                   <div className="text-center py-4 text-neutral-500">
-                    No education added yet. Click 'Add' to include your education details.
+                    No education added yet.
                   </div>
                 )}
               </CardContent>
             </Card>
+            {isOwner && (
             <EducationDialog 
               showEducationDialog={showEducationDialog}
               handleCloseEducationDialog={handleCloseEducationDialog}
@@ -572,6 +656,7 @@ const Profile = () => {
               setTempEducation={setTempEducation}
               handleSaveEducation={handleSaveEducation}
             />
+            )}
           </TabsContent>
 
           <TabsContent value="certifications">

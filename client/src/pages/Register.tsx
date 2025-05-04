@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link, useLocation } from "wouter";
-import { BriefcaseIcon, UserIcon, BuildingIcon, GraduationCapIcon, CheckCircleIcon, ArrowRightIcon, MailIcon, LockIcon, UserCircleIcon } from "lucide-react";
+import { BriefcaseIcon, BuildingIcon, GraduationCapIcon, CheckCircleIcon, ArrowRightIcon, MailIcon, LockIcon, UserCircleIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const Register = () => {
@@ -213,18 +213,6 @@ const Register = () => {
                       Employer hiring interns
                     </div>
                   </SelectItem>
-                  <SelectItem value="supervisor" className="flex items-center">
-                    <div className="flex items-center">
-                      <UserIcon className="h-4 w-4 mr-2 text-[#0A77FF]" />
-                      Internship supervisor
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="educator" className="flex items-center">
-                    <div className="flex items-center">
-                      <UserIcon className="h-4 w-4 mr-2 text-[#0A77FF]" />
-                      Educator/University staff
-                    </div>
-                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -295,8 +283,8 @@ const Register = () => {
                 <CheckCircleIcon className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="font-medium text-xl mb-1">Powerful professional profile</h3>
-                <p className="text-white/80">Create a compelling digital presence that showcases your skills, experience, and career aspirations.</p>
+                <h3 className="font-medium text-xl mb-1">For Students</h3>
+                <p className="text-white/80">Find the perfect internship, build your professional network, and kickstart your career journey.</p>
               </div>
             </div>
             
@@ -305,8 +293,8 @@ const Register = () => {
                 <CheckCircleIcon className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="font-medium text-xl mb-1">Exclusive internship access</h3>
-                <p className="text-white/80">Get connected to thousands of internship opportunities at top companies in your field.</p>
+                <h3 className="font-medium text-xl mb-1">For Employers</h3>
+                <p className="text-white/80">Discover talented students, post internships, and build your future workforce.</p>
               </div>
             </div>
             
@@ -315,8 +303,8 @@ const Register = () => {
                 <CheckCircleIcon className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="font-medium text-xl mb-1">Community of professionals</h3>
-                <p className="text-white/80">Connect with peers, mentors, and industry leaders who can help guide your career journey.</p>
+                <h3 className="font-medium text-xl mb-1">Professional Growth</h3>
+                <p className="text-white/80">Access resources and tools to help you succeed in your professional development.</p>
               </div>
             </div>
             
@@ -325,8 +313,8 @@ const Register = () => {
                 <CheckCircleIcon className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="font-medium text-xl mb-1">Learning resources</h3>
-                <p className="text-white/80">Access tools, templates, and guidance to help you succeed in your professional development.</p>
+                <h3 className="font-medium text-xl mb-1">Community Support</h3>
+                <p className="text-white/80">Join a community of professionals and get the support you need to succeed.</p>
               </div>
             </div>
           </div>
