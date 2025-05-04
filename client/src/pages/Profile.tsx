@@ -76,6 +76,52 @@ interface ProfileProps {
   id?: string;
 }
 
+async function fetchCandidateProfile(candidateId: string) {
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+    if (!apiUrl) {
+      throw new Error("API URL is not configured. Please check your .env file.");
+    }
+
+    const response = await fetch(`${apiUrl}/api/candidates/${candidateId}`, {
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(`Failed to fetch profile: ${response.status} ${response.statusText}${errorData ? ` - ${JSON.stringify(errorData)}` : ''}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Profile fetch error:', error);
+    toast({
+      title: "Error",
+      description: error instanceof Error ? error.message : "Failed to fetch profile data.",
+      variant: "destructive",
+    });
+    return null;
+  }
+}
+
+async function deleteCandidateProfile(candidateId: string) {
+  try {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/candidates/${candidateId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!response.ok) throw new Error("Failed to delete profile");
+    return true;
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: "Failed to delete profile.",
+      variant: "destructive",
+    });
+    return false;
+  }
+}
+
 const Profile = ({ id }: ProfileProps) => {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
@@ -214,39 +260,44 @@ const Profile = ({ id }: ProfileProps) => {
   }, [profile.firstName, profile.lastName]);
 
   useEffect(() => {
-    // If we have an ID, fetch the profile data for that user
     if (id) {
-      // TODO: Fetch profile data for the specified user ID
-      console.log(`Fetching profile data for user ID: ${id}`);
-      // fetchProfileData(id).then(data => {
-      //   setProfile(data);
-      //   setCertifications(data.certifications);
-      //   setExperiences(data.experiences);
-      // });
-    } else {
-      // No ID means we're viewing our own profile
-      // Use the authenticated user's data
-      if (user) {
-        setProfile({
-          ...profile,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          // ... other profile fields
-        });
-      }
+      fetchCandidateProfile(id).then(data => {
+        
+        if (data) {
+          setProfile(prev => ({
+            ...prev,
+            id: data.id,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+            phone: data.phone,
+            location: data.location,
+            title: data.title,
+            company: data.companyOrUniversity,
+            website: data.website,
+            about: data.about,
+            profilePicture: data.photo,
+          }));
+        }
+      });
+    } else if (user) {
+      setProfile(prev => ({
+        ...prev,
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+      }));
     }
   }, [id, user]);
 
   useEffect(() => {
     if (user && id) {
-      // If we have both user and id, compare them
       setIsOwner(user.id === parseInt(id));
     } else if (user && !id) {
       // If no id is provided, it means we're viewing our own profile
       setIsOwner(true);
     } else {
-      // If no user or different user, not the owner
       setIsOwner(false);
     }
   }, [user, id]);
@@ -509,9 +560,8 @@ const Profile = ({ id }: ProfileProps) => {
           handleProfileUpdate={handleProfileUpdate}
         />
       ) : (
-        <>
-          {/* Profile Header */}
-          <Card className="mb-6 overflow-hidden">
+        <div className="mb-6">
+          <Card className="overflow-hidden">
             <div className="h-32 bg-gradient-to-r from-primary-500 to-purple-500"></div>
             <CardContent className="relative">
               <div className="absolute -top-16 left-4 md:left-8">
@@ -545,26 +595,24 @@ const Profile = ({ id }: ProfileProps) => {
                   </div>
                 </div>
                 
-                <div className="mt-4 md:mt-0">
-                  {isOwner ? (
-                    <Button onClick={handleStartEditing}>
-                      <PenIcon className="h-4 w-4 mr-2" /> Edit Profile
+                {isOwner ? (
+                  <Button onClick={handleStartEditing}>
+                    <PenIcon className="h-4 w-4 mr-2" /> Edit Profile
+                  </Button>
+                ) : (
+                  <div className="flex space-x-2">
+                    <Button variant="outline" onClick={() => handleConnect(profile.id.toString())}>
+                      <UserPlusIcon className="h-4 w-4 mr-2" /> Connect
                     </Button>
-                  ) : (
-                    <div className="flex space-x-2">
-                      <Button variant="outline" onClick={() => handleConnect(profile.id.toString())}>
-                        <UserPlusIcon className="h-4 w-4 mr-2" /> Connect
-                      </Button>
-                      <Button variant="outline" onClick={() => handleMessage(profile.id.toString())}>
-                        <MessageCircleIcon className="h-4 w-4 mr-2" /> Message
-                      </Button>
-                    </div>
-                  )}
-                </div>
+                    <Button variant="outline" onClick={() => handleMessage(profile.id.toString())}>
+                      <MessageCircleIcon className="h-4 w-4 mr-2" /> Message
+                    </Button>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
-        </>
+        </div>
       )}
       
       <div className="w-full">
