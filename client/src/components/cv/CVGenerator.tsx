@@ -4,6 +4,7 @@ import { FileDownIcon, EyeIcon, MapPinIcon, MailIcon, PhoneIcon } from "lucide-r
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Experience } from '@/types/experience';
 
 interface Education {
   id: number;
@@ -25,16 +26,6 @@ interface Certification {
   issuer: string;
   date: string;
   credentialId: string;
-}
-
-interface Experience {
-  id: number;
-  title: string;
-  company: string;
-  location: string;
-  startDate: string;
-  endDate: string;
-  description: string;
 }
 
 interface CVData {

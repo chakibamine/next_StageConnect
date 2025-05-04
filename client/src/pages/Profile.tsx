@@ -45,17 +45,8 @@ import { useLocation } from "wouter";
 import { getEducationList, createEducation, updateEducation, deleteEducation, getCertificationList, createCertification, updateCertification, deleteCertification } from '../lib/api';
 import type { Education, EducationFormData } from '../types/education';
 import type { Certification, CertificationFormData } from '../types/certification';
-
-// Define types for our sections
-interface Experience {
-  id: number;
-  title: string;
-  company: string;
-  location: string;
-  startDate: string;
-  endDate: string;
-  description: string;
-}
+import { Experience, ExperienceFormData } from '../types/experience';
+import { experienceService } from '../services/experienceService';
 
 interface ProfileProps {
   id?: string;
@@ -82,7 +73,8 @@ async function fetchCandidateProfile(candidateId: string) {
       ...data,
       profilePicture: data.photo || null,
       education: data.education || [],
-      certifications: data.certifications || []
+      certifications: data.certifications || [],
+      experiences: data.experiences || []
     };
   } catch (error) {
     console.error('Profile fetch error:', error);
@@ -194,7 +186,7 @@ const Profile = ({ id }: ProfileProps) => {
   // Temporary state for form values to prevent re-renders
   const [tempEducation, setTempEducation] = useState<EducationFormData | null>(null);
   const [tempCertification, setTempCertification] = useState<Certification | null>(null);
-  const [tempExperience, setTempExperience] = useState<Experience | null>(null);
+  const [tempExperience, setTempExperience] = useState<ExperienceFormData | null>(null);
 
   // Profile state
   const [profile, setProfile] = useState<ProfileData>(initialProfile);
@@ -294,6 +286,7 @@ const Profile = ({ id }: ProfileProps) => {
           }));
           setEducations(data.education || []);
           setCertifications(data.certifications || []);
+          setExperiences(data.experiences || []);
         }
       });
     } else if (user) {
@@ -504,57 +497,79 @@ const Profile = ({ id }: ProfileProps) => {
 
   // Experience handlers
   const handleAddExperience = () => {
+    const newExperience: ExperienceFormData = {
+      title: '',
+      company: '',
+      location: '',
+      startDate: '',
+      endDate: '',
+      description: ''
+    };
     setEditingExperience(null);
-    setTempExperience({
-      id: 0,
-      title: "",
-      company: "",
-      location: "",
-      startDate: "",
-      endDate: "",
-      description: ""
-    });
+    setTempExperience(newExperience);
     setShowExperienceDialog(true);
   };
 
   const handleEditExperience = (exp: Experience) => {
     setEditingExperience(exp);
-    setTempExperience(exp);
+    setTempExperience({
+      title: exp.title,
+      company: exp.company,
+      location: exp.location,
+      startDate: format(new Date(exp.startDate), 'yyyy-MM-dd'),
+      endDate: exp.endDate ? format(new Date(exp.endDate), 'yyyy-MM-dd') : undefined,
+      description: exp.description
+    });
     setShowExperienceDialog(true);
   };
 
-  const handleDeleteExperience = (id: number) => {
-    setExperiences(prev => prev.filter(exp => exp.id !== id));
-    toast({
-      title: "Experience deleted",
-      description: "Experience has been deleted successfully."
-    });
-  };
-
-  const handleSaveExperience = () => {
-    if (!tempExperience) return;
-    
-    if (editingExperience) {
-      // Update existing experience
-      setExperiences(prev => prev.map(exp => 
-        exp.id === tempExperience.id ? tempExperience : exp
-      ));
+  const handleDeleteExperience = async (id: number) => {
+    try {
+      await experienceService.deleteExperience(profile.id, id);
+      setExperiences(prev => prev.filter(exp => exp.id !== id));
       toast({
-        title: "Experience updated",
-        description: "Experience has been updated successfully."
+        title: "Experience deleted",
+        description: "Experience has been deleted successfully."
       });
-    } else {
-      // Add new experience
-      setExperiences(prev => [...prev, { ...tempExperience, id: prev.length + 1 }]);
+    } catch (error) {
+      console.error('Failed to delete experience:', error);
       toast({
-        title: "Experience added",
-        description: "New experience has been added successfully."
+        title: "Error",
+        description: "Failed to delete experience. Please try again.",
+        variant: "destructive"
       });
     }
+  };
 
-    setShowExperienceDialog(false);
-    setEditingExperience(null);
-    setTempExperience(null);
+  const handleSaveExperience = async () => {
+    if (!tempExperience) return;
+    
+    try {
+      let savedExperience: Experience;
+      if (editingExperience?.id) {
+        savedExperience = await experienceService.updateExperience(profile.id, editingExperience.id, tempExperience);
+        setExperiences(prev => prev.map(exp => 
+          exp.id === editingExperience.id ? savedExperience : exp
+        ));
+      } else {
+        savedExperience = await experienceService.createExperience(profile.id, tempExperience);
+        setExperiences(prev => [...prev, savedExperience]);
+      }
+      setShowExperienceDialog(false);
+      setEditingExperience(null);
+      setTempExperience(null);
+      toast({
+        title: "Success",
+        description: `Experience ${editingExperience ? 'updated' : 'added'} successfully.`
+      });
+    } catch (error) {
+      console.error('Failed to save experience:', error);
+      toast({
+        title: "Error",
+        description: `Failed to ${editingExperience ? 'update' : 'add'} experience. Please try again.`,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleCloseExperienceDialog = () => {
