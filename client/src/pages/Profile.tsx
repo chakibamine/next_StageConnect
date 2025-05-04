@@ -88,7 +88,8 @@ async function fetchCandidateProfile(candidateId: string) {
     const data = await response.json();
     return {
       ...data,
-      profilePicture: data.photo || null // Map photo to profilePicture
+      profilePicture: data.photo || null, // Map photo to profilePicture
+      education: data.education || [] // Include education data
     };
   } catch (error) {
     console.error('Profile fetch error:', error);
@@ -295,8 +296,10 @@ const Profile = ({ id }: ProfileProps) => {
             company: data.companyOrUniversity,
             website: data.website,
             about: data.about,
-            profilePicture: data.profilePicture
+            profilePicture: data.profilePicture,
+            education: data.education // Set education from profile data
           }));
+          setEducations(data.education || []); // Update educations state
         }
       });
     } else if (user) {
