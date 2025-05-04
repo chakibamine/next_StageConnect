@@ -1,4 +1,6 @@
 // Base API URL configuration
+import type { Education, EducationFormData } from '../types/education';
+
 const API_BASE_URL =  'http://localhost:8080';
 
 /**
@@ -233,5 +235,101 @@ export const api = {
     } catch (error) {
       return Promise.reject(handleFetchError(error, endpoint));
     }
+  }
+};
+
+// Education API endpoints
+export const getEducationList = async (candidateId: number): Promise<Education[]> => {
+  try {
+    const response = await fetch(apiUrl(`/api/candidates/${candidateId}/education`), {
+      headers: getAuthHeaders(),
+      credentials: 'include'
+    });
+    return handleApiResponse(response);
+  } catch (error) {
+    console.error('Failed to fetch education list:', error);
+    throw new Error('Failed to fetch education list');
+  }
+};
+
+export const getEducation = async (candidateId: number, educationId: number): Promise<Education> => {
+  try {
+    const response = await fetch(apiUrl(`/api/candidates/${candidateId}/education/${educationId}`), {
+      headers: getAuthHeaders(),
+      credentials: 'include'
+    });
+    return handleApiResponse(response);
+  } catch (error) {
+    console.error('Failed to fetch education:', error);
+    throw new Error('Failed to fetch education');
+  }
+};
+
+export const createEducation = async (candidateId: number, education: EducationFormData): Promise<Education> => {
+  try {
+    // Format dates to match backend expectations
+    const formattedEducation = {
+      ...education,
+      startDate: education.startDate.split('T')[0], // Remove time part if present
+      endDate: education.endDate?.split('T')[0] // Remove time part if present
+    };
+
+    const response = await fetch(apiUrl(`/api/candidates/${candidateId}/education`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(formattedEducation),
+      credentials: 'include'
+    });
+    const result = await handleApiResponse<{ success: boolean; message: string; data: Education }>(response);
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+    return result.data;
+  } catch (error) {
+    console.error('Failed to create education:', error);
+    throw error;
+  }
+};
+
+export const updateEducation = async (candidateId: number, educationId: number, education: EducationFormData): Promise<Education> => {
+  try {
+    // Format dates to match backend expectations
+    const formattedEducation = {
+      ...education,
+      startDate: education.startDate.split('T')[0], // Remove time part if present
+      endDate: education.endDate?.split('T')[0] // Remove time part if present
+    };
+
+    const response = await fetch(apiUrl(`/api/candidates/${candidateId}/education/${educationId}`), {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(formattedEducation),
+      credentials: 'include'
+    });
+    const result = await handleApiResponse<{ success: boolean; message: string; data: Education }>(response);
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+    return result.data;
+  } catch (error) {
+    console.error('Failed to update education:', error);
+    throw error;
+  }
+};
+
+export const deleteEducation = async (candidateId: number, educationId: number): Promise<void> => {
+  try {
+    const response = await fetch(apiUrl(`/api/candidates/${candidateId}/education/${educationId}`), {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+      credentials: 'include'
+    });
+    const result = await handleApiResponse<{ success: boolean; message: string }>(response);
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+  } catch (error) {
+    console.error('Failed to delete education:', error);
+    throw error;
   }
 }; 

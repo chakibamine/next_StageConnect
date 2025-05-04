@@ -225,10 +225,27 @@ const ProfileEditForm: React.FC<ProfileEditFormProps> = ({
             profilePicture: updated.photo
           }));
         }
+        
+        // Update all profile fields with the server response
+        setTempProfile(prev => ({
+          ...prev,
+          firstName: updated.firstName || prev.firstName,
+          lastName: updated.lastName || prev.lastName,
+          email: updated.email || prev.email,
+          phone: updated.phone || prev.phone,
+          location: updated.location || prev.location,
+          title: updated.title || prev.title,
+          company: updated.companyOrUniversity || prev.company,
+          website: updated.website || prev.website,
+          about: updated.about || prev.about,
+        }));
+
         toast({
           title: "Success",
           description: "Profile updated successfully",
         });
+        
+        // Call handleProfileUpdate to sync changes with parent component
         handleProfileUpdate();
       }
     } catch (error) {

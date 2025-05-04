@@ -42,17 +42,10 @@ import EducationDialog from "@/components/profile/EducationDialog";
 import CertificationDialog from "@/components/profile/CertificationDialog";
 import ExperienceDialog from "@/components/profile/ExperienceDialog";
 import { useLocation } from "wouter";
+import { getEducationList, createEducation, updateEducation, deleteEducation } from '../lib/api';
+import type { Education, EducationFormData } from '../types/education';
 
 // Define types for our sections
-interface Education {
-  id: number;
-  degree: string;
-  institution: string;
-  startDate: string;
-  endDate: string;
-  description: string;
-}
-
 interface Certification {
   id: number;
   name: string;
@@ -126,6 +119,51 @@ async function deleteCandidateProfile(candidateId: string) {
   }
 }
 
+const initialProfile: ProfileData = {
+  id: 0,
+  firstName: "Alex",
+  lastName: "Johnson",
+  email: "alex.johnson@email.com",
+  phone: "+33 6 12 34 56 78",
+  location: "Paris, France",
+  title: "Computer Science Student",
+  company: "Paris University",
+  website: "alexjohnson.dev",
+  about: "Computer Science student passionate about web development and UX design. Looking for internship opportunities to apply my technical skills and gain professional experience.",
+  education: [
+    {
+      id: 1,
+      degree: "Bachelor of Computer Science",
+      institution: "Paris University",
+      startDate: "2020-09-01",
+      endDate: "2024-06-30",
+      description: "Specializing in software development and data structures. Coursework includes algorithms, web development, database management, and mobile application development."
+    },
+    {
+      id: 2,
+      degree: "High School Diploma",
+      institution: "Lycée International de Paris",
+      startDate: "2017-09-01",
+      endDate: "2020-06-30",
+      description: "Scientific track with focus on mathematics and computer science. Graduated with honors."
+    }
+  ],
+  skills: [
+    "JavaScript",
+    "React",
+    "TypeScript",
+    "Java",
+    "Spring Boot",
+    "SQL"
+  ],
+  languages: [
+    { language: "English", proficiency: "Fluent" },
+    { language: "French", proficiency: "Native" },
+    { language: "Spanish", proficiency: "Intermediate" }
+  ],
+  profilePicture: null
+};
+
 const Profile = ({ id }: ProfileProps) => {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
@@ -160,58 +198,12 @@ const Profile = ({ id }: ProfileProps) => {
   const [showExperienceDialog, setShowExperienceDialog] = useState(false);
 
   // Temporary state for form values to prevent re-renders
-  const [tempEducation, setTempEducation] = useState<Education | null>(null);
+  const [tempEducation, setTempEducation] = useState<EducationFormData | null>(null);
   const [tempCertification, setTempCertification] = useState<Certification | null>(null);
   const [tempExperience, setTempExperience] = useState<Experience | null>(null);
 
   // Profile state
-  const [profile, setProfile] = useState<ProfileData>({
-    id: 0,
-    firstName: "Alex",
-    lastName: "Johnson",
-    email: "alex.johnson@email.com",
-    phone: "+33 6 12 34 56 78",
-    location: "Paris, France",
-    title: "Computer Science Student",
-    company: "Paris University",
-    website: "alexjohnson.dev",
-    about: "Computer Science student passionate about web development and UX design. Looking for internship opportunities to apply my technical skills and gain professional experience.",
-    education: [
-      {
-        id: 1,
-        degree: "Bachelor of Computer Science",
-        institution: "Paris University",
-        startDate: "Sep 2020",
-        endDate: "Present",
-        description: "Specializing in software development and data structures. Coursework includes algorithms, web development, database management, and mobile application development."
-      },
-      {
-        id: 2,
-        degree: "High School Diploma",
-        institution: "Lycée International de Paris",
-        startDate: "Sep 2017",
-        endDate: "Jun 2020",
-        description: "Scientific track with focus on mathematics and computer science. Graduated with honors."
-      }
-    ],
-    skills: [
-      "JavaScript",
-      "React",
-      "TypeScript",
-      "HTML/CSS",
-      "Node.js",
-      "Python",
-      "UI/UX Design",
-      "Git",
-      "SQL"
-    ],
-    languages: [
-      { language: "English", proficiency: "Fluent" },
-      { language: "French", proficiency: "Native" },
-      { language: "Spanish", proficiency: "Intermediate" }
-    ],
-    profilePicture: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80"
-  });
+  const [profile, setProfile] = useState<ProfileData>(initialProfile);
 
   // Define certifications and experiences as part of the profile state
   const [certifications, setCertifications] = useState<Certification[]>([
@@ -258,6 +250,30 @@ const Profile = ({ id }: ProfileProps) => {
   const [tempProfile, setTempProfile] = useState({...profile});
 
   const [, navigate] = useLocation();
+
+  // Add this near the top where other state variables are defined
+  const [educations, setEducations] = useState<Education[]>([]);
+
+  // Add this to your useEffect section
+  useEffect(() => {
+    if (profile.id) {
+      fetchEducations();
+    }
+  }, [profile.id]);
+
+  const fetchEducations = async () => {
+    try {
+      const data = await getEducationList(profile.id);
+      setEducations(data);
+    } catch (error) {
+      console.error('Failed to fetch educations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load education history.",
+        variant: "destructive"
+      });
+    }
+  };
 
   useEffect(() => {
     document.title = `${profile.firstName} ${profile.lastName} | StageConnect`;
@@ -306,7 +322,15 @@ const Profile = ({ id }: ProfileProps) => {
   }, [user, id]);
 
   const handleProfileUpdate = () => {
-    setProfile(tempProfile);
+    // Update the main profile state with the temporary profile data
+    setProfile(prev => ({
+      ...prev,
+      ...tempProfile,
+      // Ensure we keep the arrays that might not be in tempProfile
+      education: prev.education,
+      skills: prev.skills,
+      languages: prev.languages
+    }));
     setIsEditing(false);
     toast({
       title: "Profile updated",
@@ -330,62 +354,73 @@ const Profile = ({ id }: ProfileProps) => {
 
   // Education handlers
   const handleAddEducation = () => {
-    const newEducation = {
-      id: 0,
-      degree: "",
-      institution: "",
-      startDate: "",
-      endDate: "",
-      description: ""
+    const newEducation: EducationFormData = {
+      degree: '',
+      institution: '',
+      startDate: '',
+      endDate: '',
+      description: ''
     };
-    setEditingEducation(newEducation);
+    setEditingEducation(null);
     setTempEducation(newEducation);
     setShowEducationDialog(true);
   };
 
   const handleEditEducation = (edu: Education) => {
     setEditingEducation(edu);
-    setTempEducation(edu);
+    setTempEducation({
+      degree: edu.degree,
+      institution: edu.institution,
+      startDate: edu.startDate,
+      endDate: edu.endDate,
+      description: edu.description
+    });
     setShowEducationDialog(true);
   };
 
-  const handleDeleteEducation = (id: number) => {
-    setProfile(prev => ({
-      ...prev,
-      education: prev.education.filter(edu => edu.id !== id)
-    }));
-    toast({
-      title: "Education deleted",
-      description: "Education entry has been removed successfully."
-    });
+  const handleDeleteEducation = async (id: number) => {
+    try {
+      await deleteEducation(profile.id, id);
+      await fetchEducations(); // Refresh the education list
+      toast({
+        title: "Success",
+        description: "Education entry deleted successfully."
+      });
+    } catch (error) {
+      console.error('Failed to delete education:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete education entry.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleSaveEducation = () => {
+  const handleSaveEducation = async () => {
     if (!tempEducation) return;
-    
-    if (editingEducation) {
-      // Update existing education
-      setProfile(prev => ({
-        ...prev,
-        education: prev.education.map(edu => 
-          edu.id === tempEducation.id ? tempEducation : edu
-        )
-      }));
-    } else {
-      // Add new education
-      setProfile(prev => ({
-        ...prev,
-        education: [...prev.education, { ...tempEducation, id: prev.education.length + 1 }]
-      }));
-    }
 
-    setShowEducationDialog(false);
-    setEditingEducation(null);
-    setTempEducation(null);
-    toast({
-      title: "Education updated",
-      description: "Education entry has been updated successfully."
-    });
+    try {
+      let savedEducation: Education;
+      if (editingEducation?.id) {
+        savedEducation = await updateEducation(profile.id, editingEducation.id, tempEducation);
+      } else {
+        savedEducation = await createEducation(profile.id, tempEducation);
+      }
+
+      await fetchEducations(); // Refresh the education list
+      handleCloseEducationDialog();
+      toast({
+        title: "Success",
+        description: `Education ${editingEducation?.id ? 'updated' : 'added'} successfully.`
+      });
+    } catch (error) {
+      console.error('Failed to save education:', error);
+      toast({
+        title: "Error",
+        description: `Failed to ${editingEducation?.id ? 'update' : 'add'} education.`,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleCloseEducationDialog = () => {
@@ -570,7 +605,7 @@ const Profile = ({ id }: ProfileProps) => {
               <div className="absolute -top-16 left-4 md:left-8">
                 <Avatar className="h-32 w-32 border-4 border-white">
                   <AvatarImage 
-                    src={typeof profile.profilePicture === 'string' ? `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}${profile.profilePicture}` : undefined}
+                    src={typeof profile.profilePicture === 'string' ? `${profile.profilePicture}` : undefined}
                     alt={`${profile.firstName} ${profile.lastName}`} 
                   />
                   <AvatarFallback>{profile.firstName[0]}{profile.lastName[0]}</AvatarFallback>
@@ -659,7 +694,7 @@ const Profile = ({ id }: ProfileProps) => {
                 )}
               </CardHeader>
               <CardContent className="space-y-4">
-                {profile.education.map((edu) => (
+                {educations.map((edu) => (
                   <div key={edu.id} className="border-b border-neutral-200 last:border-0 pb-4 last:pb-0">
                     <div className="flex items-start">
                       <div className="rounded-md bg-neutral-100 p-2 mr-4">
@@ -668,7 +703,9 @@ const Profile = ({ id }: ProfileProps) => {
                       <div className="flex-1">
                         <h3 className="font-medium">{edu.degree}</h3>
                         <p className="text-primary-600">{edu.institution}</p>
-                        <p className="text-sm text-neutral-500">{edu.startDate} - {edu.endDate}</p>
+                        <p className="text-sm text-neutral-500">
+                          {format(new Date(edu.startDate), 'MMM yyyy')} - {edu.endDate ? format(new Date(edu.endDate), 'MMM yyyy') : 'Present'}
+                        </p>
                         {edu.description && (
                           <p className="mt-2 text-sm text-neutral-600">{edu.description}</p>
                         )}
@@ -694,15 +731,14 @@ const Profile = ({ id }: ProfileProps) => {
                     </div>
                   </div>
                 ))}
-                {profile.education.length === 0 && (
+                {educations.length === 0 && (
                   <div className="text-center py-4 text-neutral-500">
                     No education added yet.
                   </div>
                 )}
               </CardContent>
             </Card>
-            {isOwner && (
-            <EducationDialog 
+            <EducationDialog
               showEducationDialog={showEducationDialog}
               handleCloseEducationDialog={handleCloseEducationDialog}
               editingEducation={editingEducation}
@@ -710,7 +746,6 @@ const Profile = ({ id }: ProfileProps) => {
               setTempEducation={setTempEducation}
               handleSaveEducation={handleSaveEducation}
             />
-            )}
           </TabsContent>
 
           <TabsContent value="certifications">
