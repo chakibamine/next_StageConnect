@@ -108,9 +108,7 @@ const Feed = () => {
         </div>
         
         {posts.map((post) => (
-          
-            <PostCard post={post} />
-          
+          <PostCard key={post.id} post={post} />
         ))}
         
         <div className="text-center pt-2 border-t border-neutral-200">

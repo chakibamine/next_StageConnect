@@ -10,6 +10,11 @@ export default defineConfig({
     runtimeErrorOverlay(),
     themePlugin(),
   ],
+  server: {
+    hmr: {
+      overlay: false
+    }
+  },
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
