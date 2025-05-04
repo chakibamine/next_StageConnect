@@ -92,7 +92,11 @@ async function fetchCandidateProfile(candidateId: string) {
       throw new Error(`Failed to fetch profile: ${response.status} ${response.statusText}${errorData ? ` - ${JSON.stringify(errorData)}` : ''}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+    return {
+      ...data,
+      profilePicture: data.photo || null // Map photo to profilePicture
+    };
   } catch (error) {
     console.error('Profile fetch error:', error);
     toast({
@@ -262,7 +266,6 @@ const Profile = ({ id }: ProfileProps) => {
   useEffect(() => {
     if (id) {
       fetchCandidateProfile(id).then(data => {
-        
         if (data) {
           setProfile(prev => ({
             ...prev,
@@ -276,7 +279,7 @@ const Profile = ({ id }: ProfileProps) => {
             company: data.companyOrUniversity,
             website: data.website,
             about: data.about,
-            profilePicture: data.photo,
+            profilePicture: data.profilePicture
           }));
         }
       });
@@ -566,7 +569,10 @@ const Profile = ({ id }: ProfileProps) => {
             <CardContent className="relative">
               <div className="absolute -top-16 left-4 md:left-8">
                 <Avatar className="h-32 w-32 border-4 border-white">
-                  <AvatarImage src={profile.profilePicture} alt={`${profile.firstName} ${profile.lastName}`} />
+                  <AvatarImage 
+                    src={typeof profile.profilePicture === 'string' ? `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}${profile.profilePicture}` : undefined}
+                    alt={`${profile.firstName} ${profile.lastName}`} 
+                  />
                   <AvatarFallback>{profile.firstName[0]}{profile.lastName[0]}</AvatarFallback>
                 </Avatar>
               </div>
