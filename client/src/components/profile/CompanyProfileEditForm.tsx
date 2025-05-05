@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import {
   LandmarkIcon
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { toast } from "@/components/ui/use-toast";
 
 // Define company info interfaces
 interface CompanyInfo {
@@ -45,7 +46,8 @@ interface CompanyProfileEditFormProps {
   tempContactInfo: ContactInfo;
   setTempContactInfo: React.Dispatch<React.SetStateAction<ContactInfo>>;
   handleCancelEditing: () => void;
-  handleProfileUpdate: () => void;
+  onProfileUpdate: () => void;
+  profileId: string;
 }
 
 const CompanyProfileEditForm = ({
@@ -54,9 +56,52 @@ const CompanyProfileEditForm = ({
   tempContactInfo,
   setTempContactInfo,
   handleCancelEditing,
-  handleProfileUpdate
+  onProfileUpdate,
+  profileId
 }: CompanyProfileEditFormProps) => {
   
+  useEffect(() => {
+    const fetchCompanyData = async () => {
+      try {
+        const response = await fetch(`http://localhost:8080/api/companies/${profileId}`, {
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch company data');
+        }
+
+        const data = await response.json();
+        
+        // Update company info
+        setTempCompany({
+          name: data.name,
+          industry: data.industry,
+          size: data.size,
+          founded: data.foundedDate,
+          website: data.website,
+          location: data.location,
+          description: data.description,
+          logo: data.logo
+        });
+
+        // Update contact info
+        setTempContactInfo({
+          email: data.email,
+          phone: data.phone,
+          address: data.address,
+          city: data.city,
+          postalCode: data.postalCode,
+          country: data.country
+        });
+      } catch (error) {
+        console.error('Error fetching company data:', error);
+      }
+    };
+
+    fetchCompanyData();
+  }, [profileId, setTempCompany, setTempContactInfo]);
+
   // Industry options
   const industries = [
     "Software Development",
@@ -105,6 +150,42 @@ const CompanyProfileEditForm = ({
       ...tempContactInfo,
       [name]: value
     });
+  };
+  
+  const handleSubmit = async () => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/companies/${profileId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: tempCompany.name,
+          industry: tempCompany.industry,
+          size: tempCompany.size,
+          foundedDate: tempCompany.founded,
+          website: tempCompany.website,
+          location: tempCompany.location,
+          description: tempCompany.description,
+          email: tempContactInfo.email,
+          phone: tempContactInfo.phone,
+          address: tempContactInfo.address,
+          city: tempContactInfo.city,
+          postalCode: tempContactInfo.postalCode,
+          country: tempContactInfo.country
+        }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update company profile');
+      }
+
+      // Call the parent's onProfileUpdate to update the UI
+      onProfileUpdate();
+    } catch (error) {
+      console.error('Error updating company profile:', error);
+    }
   };
   
   return (
@@ -336,7 +417,7 @@ const CompanyProfileEditForm = ({
         <Button variant="outline" onClick={handleCancelEditing}>
           Cancel
         </Button>
-        <Button onClick={handleProfileUpdate}>
+        <Button onClick={handleSubmit}>
           Save Changes
         </Button>
       </div>

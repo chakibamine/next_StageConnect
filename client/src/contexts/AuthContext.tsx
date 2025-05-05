@@ -9,6 +9,7 @@ interface User {
   role: "admin" | "student" | "supervisor" | "employer";
   profilePicture?: string;
   company?: string;
+  company_id?: number;
 }
 
 interface AuthContextType {
@@ -38,6 +39,7 @@ interface LoginResponse {
   email: string;
   userType: string;
   companyName?: string;
+  company_id?: number;
   profile?: {
     profilePicture?: string;
   };
@@ -205,9 +207,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         profilePicture: data.profile?.profilePicture,
       };
       
-      // Add company field for employer
-      if (userRole === "employer" && data.companyName) {
-        user.company = data.companyName;
+      // Add company fields for employer
+      if (userRole === "employer") {
+        if (data.companyName) {
+          user.company = data.companyName;
+        }
+        if (data.company_id) {
+          user.company_id = data.company_id;
+        }
       }
       
       // Store token and user in localStorage using the helper function

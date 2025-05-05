@@ -105,7 +105,7 @@ const Header = () => {
   // Get profile link based on user role
   const getProfileLink = () => {
     if (!user) return "/profile";
-    return user.role === "employer" ? `/company/${user.id}` : `/profile/${user.id}`;
+    return user.role === "employer" ? `/company/${user.company_id}` : `/profile/${user.id}`;
   };
 
   const NavItem = ({ 

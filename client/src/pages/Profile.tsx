@@ -304,7 +304,6 @@ const Profile = ({ id }: ProfileProps) => {
     if (user && id) {
       setIsOwner(user.id === parseInt(id));
     } else if (user && !id) {
-      // If no id is provided, it means we're viewing our own profile
       setIsOwner(true);
     } else {
       setIsOwner(false);

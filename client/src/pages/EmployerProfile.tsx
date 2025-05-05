@@ -47,6 +47,7 @@ import { Award, Medal, Star } from "lucide-react";
 import EditItemDialog from "@/components/profile/EditItemDialog";
 import { useRoute, useLocation } from "wouter"; // Import wouter routing hooks
 import { Link } from "wouter";
+import axios from "axios";
 
 // Define employer profile interfaces
 interface CompanyInfo {
@@ -128,7 +129,7 @@ interface EmployerProfileProps {
 
 const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfileProps) => {
   const [, params] = useRoute("/company/:id");
-  const profileId = id || params?.id || companyId;
+  const profileId = id || params?.id || companyId || "1"; // Provide a default value
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
@@ -380,119 +381,118 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
     responsibility: company.name + " is committed to making a positive impact beyond our business operations. We have implemented sustainable practices throughout our organization, supported local community initiatives, and established a foundation that focuses on improving technology education and access for underserved communities."
   });
   
-  // Add handlers for each dialog
-  const handleOpenAboutDialog = () => {
-    setTempAboutInfo({...tempAboutInfo});
-    setShowAboutDialog(true);
-  };
-  
-  const handleSaveAboutInfo = () => {
-    setTempAboutInfo(tempAboutInfo);
-    setShowAboutDialog(false);
-    toast({
-      title: "About information updated",
-      description: "Your company's about information has been updated successfully.",
-    });
-  };
-  
-  const handleOpenTechnologiesDialog = () => {
-    setTempTechnologies([...technologies]);
-    setShowTechnologiesDialog(true);
-  };
-  
-  const handleSaveTechnologies = () => {
-    setTechnologies([...tempTechnologies]);
-    setShowTechnologiesDialog(false);
-    toast({
-      title: "Technologies updated",
-      description: "Your company's technologies have been updated successfully.",
-    });
-  };
-  
-  const handleAddTechnology = (tech: string) => {
-    if (tech.trim() && !tempTechnologies.includes(tech.trim())) {
-      setTempTechnologies([...tempTechnologies, tech.trim()]);
+  // Add API base URL
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/';
+
+  // Fetch company data
+  const fetchCompanyData = async (id: string) => {
+    try {
+      console.log(`${API_BASE_URL}/api/companies/${id}`);
+      const response = await fetch(`${API_BASE_URL}/api/companies/${id}`, {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(`Failed to fetch company: ${response.status} ${response.statusText}${errorData ? ` - ${JSON.stringify(errorData)}` : ''}`);
+      }
+
+      const data = await response.json();
+      
+      // Update company state
+      setCompany({
+        name: data.name,
+        industry: data.industry,
+        size: data.size,
+        founded: data.foundedDate,
+        website: data.website,
+        location: data.location,
+        description: data.description || "",
+        logo: data.photo ? `${API_BASE_URL}${data.photo}` : company.logo
+      });
+
+      // Update contact info state
+      setContactInfo({
+        email: data.email,
+        phone: data.phone,
+        address: data.address,
+        city: data.city,
+        postalCode: data.postalCode,
+        country: data.country
+      });
+
+      // Update other states
+      setTechnologies(data.technologies || []);
+      setLegalInfo({
+        registrationNumber: data.registrationNumber,
+        vatId: data.vatId,
+        legalForm: data.legalForm
+      });
+      setSocialMedia({
+        linkedin: { active: !!data.linkedInUrl, url: data.linkedInUrl || "" },
+        twitter: { active: !!data.twitterUrl, url: data.twitterUrl || "" },
+        instagram: { active: !!data.instagramUrl, url: data.instagramUrl || "" },
+        facebook: { active: !!data.facebookUrl, url: data.facebookUrl || "" }
+      });
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching company data:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to fetch company data",
+        variant: "destructive",
+      });
     }
   };
-  
-  const handleRemoveTechnology = (tech: string) => {
-    setTempTechnologies(tempTechnologies.filter(t => t !== tech));
-  };
-  
-  const handleOpenLegalDialog = () => {
-    setTempLegalInfo({...legalInfo});
-    setShowLegalDialog(true);
-  };
-  
-  const handleSaveLegalInfo = () => {
-    setLegalInfo({...tempLegalInfo});
-    setShowLegalDialog(false);
-    toast({
-      title: "Legal information updated",
-      description: "Your company's legal information has been updated successfully.",
-    });
-  };
-  
-  const handleOpenSocialMediaDialog = () => {
-    setTempSocialMedia({...socialMedia});
-    setShowSocialMediaDialog(true);
-  };
-  
-  const handleSaveSocialMedia = () => {
-    setSocialMedia({...tempSocialMedia});
-    setShowSocialMediaDialog(false);
-    toast({
-      title: "Social media updated",
-      description: "Your company's social media preferences have been updated successfully.",
-    });
-  };
-  
-  const handleSocialMediaToggle = (platform: keyof typeof tempSocialMedia) => {
-    setTempSocialMedia({
-      ...tempSocialMedia,
-      [platform]: {
-        ...tempSocialMedia[platform],
-        active: !tempSocialMedia[platform].active
+
+  // Update company data
+  const updateCompanyData = async (formData: FormData) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}api/companies/${profileId}`,
+        {
+          method: 'PUT',
+          body: formData,
+          credentials: "include",
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(`Failed to update company: ${response.status} ${response.statusText}${errorData ? ` - ${JSON.stringify(errorData)}` : ''}`);
       }
-    });
+      
+      const data = await response.json();
+      toast({
+        title: "Success",
+        description: "Company profile updated successfully",
+      });
+      return data;
+    } catch (error) {
+      console.error('Error updating company data:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update company profile",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleSocialMediaUrlChange = (platform: keyof typeof tempSocialMedia, url: string) => {
-    setTempSocialMedia({
-      ...tempSocialMedia,
-      [platform]: {
-        ...tempSocialMedia[platform],
-        url
-      }
-    });
-  };
-
+  // Update useEffect to fetch company data
   useEffect(() => {
     document.title = `${company.name} | StageConnect`;
     
-    // If we have a profile ID, fetch the company data
     if (profileId) {
-      // TODO: Fetch company data for the specified ID
-      console.log(`Fetching company data for ID: ${profileId}`);
-      // fetchCompanyData(profileId).then(data => {
-      //   setCompany(data);
-      //   setContactInfo(data.contactInfo);
-      //   // Compare data.ownerId with user.id to set isOwnProfile
-      //   setIsOwnProfile(data.ownerId === user?.id);
-      // });
-      
-      // Set isOwnProfile based on whether the current user owns this company
+      fetchCompanyData(profileId);
       const parsedProfileId = parseInt(profileId);
-      setIsOwnProfile(user?.id === parsedProfileId);
+      setIsOwnProfile(user?.company_id === parsedProfileId);
     } else {
-      // No ID means we're viewing our own profile
       setIsOwnProfile(true);
       if (user) {
-        // Use the authenticated user's company data
         setCompany({
           ...company,
           name: user.company || company.name,
-          // ... other company fields
         });
       }
     }
@@ -502,25 +502,53 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
     setPosts([newPost, ...posts]);
   };
   
-  const handleProfileUpdate = () => {
-    setCompany(tempCompany);
-    setContactInfo(tempContactInfo);
-    setIsEditing(false);
-    toast({
-      title: "Profile updated",
-      description: "Your company profile has been updated successfully.",
-    });
+  // Update handleProfileUpdate to use the API
+  const handleProfileUpdate = async () => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/companies/${profileId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: tempCompany.name,
+          industry: tempCompany.industry,
+          size: tempCompany.size,
+          foundedDate: tempCompany.founded,
+          website: tempCompany.website,
+          location: tempCompany.location,
+          description: tempCompany.description,
+          email: tempContactInfo.email,
+          phone: tempContactInfo.phone,
+          address: tempContactInfo.address,
+          city: tempContactInfo.city,
+          postalCode: tempContactInfo.postalCode,
+          country: tempContactInfo.country
+        }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update company profile');
+      }
+
+      // Update the main states with the temporary values
+      setCompany(tempCompany);
+      setContactInfo(tempContactInfo);
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating company profile:', error);
+    }
   };
 
   const handleStartEditing = () => {
+    // Set temporary states with current values
     setTempCompany({...company});
     setTempContactInfo({...contactInfo});
     setIsEditing(true);
   };
 
   const handleCancelEditing = () => {
-    setTempCompany({...company});
-    setTempContactInfo({...contactInfo});
     setIsEditing(false);
   };
 
@@ -890,6 +918,93 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
     navigate(`/messaging?user=${parsedProfileId}`);
   };
 
+  // Add dialog state handlers
+  const handleOpenAboutDialog = () => {
+    setShowAboutDialog(true);
+  };
+
+  const handleOpenTechnologiesDialog = () => {
+    setShowTechnologiesDialog(true);
+  };
+
+  const handleOpenSocialMediaDialog = () => {
+    setShowSocialMediaDialog(true);
+  };
+
+  const handleOpenLegalDialog = () => {
+    setShowLegalDialog(true);
+  };
+
+  // Add about info handler
+  const handleSaveAboutInfo = () => {
+    setTempAboutInfo(tempAboutInfo);
+    setShowAboutDialog(false);
+    toast({
+      title: "Success",
+      description: "About information updated successfully",
+    });
+  };
+
+  // Add technology handlers
+  const handleAddTechnology = (tech: string) => {
+    if (tech && !tempTechnologies.includes(tech)) {
+      setTempTechnologies([...tempTechnologies, tech]);
+    }
+  };
+
+  const handleRemoveTechnology = (tech: string) => {
+    setTempTechnologies(tempTechnologies.filter(t => t !== tech));
+  };
+
+  const handleSaveTechnologies = () => {
+    setTechnologies(tempTechnologies);
+    setShowTechnologiesDialog(false);
+    toast({
+      title: "Success",
+      description: "Technologies updated successfully",
+    });
+  };
+
+  // Add legal info handler
+  const handleSaveLegalInfo = () => {
+    setLegalInfo(tempLegalInfo);
+    setShowLegalDialog(false);
+    toast({
+      title: "Success",
+      description: "Legal information updated successfully",
+    });
+  };
+
+  // Add social media handlers
+  const handleSocialMediaToggle = (platform: 'linkedin' | 'twitter' | 'instagram' | 'facebook') => {
+    setTempSocialMedia({
+      ...tempSocialMedia,
+      [platform]: {
+        ...tempSocialMedia[platform],
+        active: !tempSocialMedia[platform].active
+      }
+    });
+  };
+
+  const handleSocialMediaUrlChange = (platform: 'linkedin' | 'twitter' | 'instagram' | 'facebook', url: string) => {
+    setTempSocialMedia({
+      ...tempSocialMedia,
+      [platform]: {
+        ...tempSocialMedia[platform],
+        url
+      }
+    });
+  };
+
+  const handleSaveSocialMedia = () => {
+    setSocialMedia(tempSocialMedia);
+    setShowSocialMediaDialog(false);
+    toast({
+      title: "Success",
+      description: "Social media information updated successfully",
+    });
+  };
+
   return (
     <div className="container mx-auto px-4 py-6">
       {isEditing && isOwnProfile ? (
@@ -899,7 +1014,8 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
           tempContactInfo={tempContactInfo}
           setTempContactInfo={setTempContactInfo}
           handleCancelEditing={handleCancelEditing}
-          handleProfileUpdate={handleProfileUpdate}
+          onProfileUpdate={handleProfileUpdate}
+          profileId={profileId}
         />
       ) : (
         <>
