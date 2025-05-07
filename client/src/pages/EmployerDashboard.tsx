@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -56,13 +56,41 @@ import {
   SearchIcon,
   FilterIcon,
   ChevronDownIcon,
-  PieChartIcon
+  PieChartIcon,
+  MailIcon,
+  PhoneIcon,
+  GlobeIcon,
+  UserIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { internshipApi, applicationApi } from "@/services/api";
+
+// Define internship type based on API response
+type Internship = {
+  id: number;
+  title: string;
+  department: string;
+  location: string;
+  description: string;
+  requirements: string;
+  workType: string;
+  duration: string;
+  compensation: string;
+  isPaid: boolean;
+  applicants: number;
+  status: string;
+  posted: string;
+  deadline: string;
+  company?: {
+    id: number;
+    name: string;
+    logo: string;
+  };
+};
 
 // Define application type
 type Application = {
@@ -81,6 +109,24 @@ type Application = {
   appliedAt: string;
   interviewDate?: string;
   interviewTime?: string;
+  feedback?: string;
+  // New fields for detailed applicant information
+  applicant?: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    photo: string;
+    location: string;
+    title: string;
+    university: string;
+    about: string;
+    website: string;
+    educationCount?: number;
+    experienceCount?: number;
+    certificationsCount?: number;
+  };
 };
 
 // Function to format relative time
@@ -110,10 +156,14 @@ export default function EmployerDashboard() {
   const [showApplicantView, setShowApplicantView] = useState(false);
   const [currentApplicant, setCurrentApplicant] = useState<Application | null>(null);
   const [applicantNotes, setApplicantNotes] = useState("");
-  const [interviewDate, setInterviewDate] = useState("");
-  const [interviewTime, setInterviewTime] = useState("");
+  const [interviewDate, setInterviewDate] = useState<string>("");
+  const [interviewTime, setInterviewTime] = useState<string>("");
   const [feedbackRating, setFeedbackRating] = useState<number>(0);
   const [applicantStatusFilter, setApplicantStatusFilter] = useState<string>("all");
+  
+  // API fetch management
+  const [isLoadingApplications, setIsLoadingApplications] = useState(false);
+  const [applicationError, setApplicationError] = useState<string | null>(null);
   
   // Form state
   const [internshipForm, setInternshipForm] = useState({
@@ -140,87 +190,28 @@ export default function EmployerDashboard() {
     interviewingApplications: 6
   };
 
-  // Static recent applications with expanded data
-  const [applications, setApplications] = useState<Application[]>([
-    {
-      id: "app1",
-      internshipId: "int1",
-      internshipTitle: "Frontend Developer Intern",
-      applicantName: "Sarah Johnson",
-      applicantPhoto: "https://randomuser.me/api/portraits/women/44.jpg",
-      university: "Stanford University",
-      email: "sarah.j@stanford.edu",
-      phone: "+1 555-123-4567",
-      portfolio: "https://sarahjohnson.dev",
-      skills: ["React", "TypeScript", "UI/UX", "Figma"],
-      coverLetter: "I am excited to apply for the Frontend Developer Internship. With my background in React and TypeScript, I believe I can contribute significantly to your team while gaining valuable industry experience.",
-      status: "interview",
-      appliedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      interviewDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-      interviewTime: "14:00",
-    },
-    {
-      id: "app2",
-      internshipId: "int2",
-      internshipTitle: "Data Science Intern",
-      applicantName: "Michael Chen",
-      applicantPhoto: "https://randomuser.me/api/portraits/men/22.jpg",
-      university: "MIT",
-      email: "mchen@mit.edu",
-      phone: "+1 555-987-6543",
-      skills: ["Python", "Data Analysis", "Machine Learning", "SQL"],
-      coverLetter: "I am writing to express my interest in the Data Science Internship position. My strong foundation in statistical analysis and machine learning, combined with my passion for solving complex problems, makes me a suitable candidate for this role.",
-      status: "pending",
-      appliedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: "app3",
-      internshipId: "int1",
-      internshipTitle: "Frontend Developer Intern",
-      applicantName: "Emma Wilson",
-      applicantPhoto: "https://randomuser.me/api/portraits/women/63.jpg",
-      university: "UC Berkeley",
-      email: "emma.w@berkeley.edu",
-      phone: "+1 555-345-6789",
-      portfolio: "https://emmawilson.io",
-      skills: ["JavaScript", "React", "CSS", "Web Design"],
-      coverLetter: "I'm applying for the Frontend Developer Internship at your company. With my passion for creating beautiful and functional user interfaces, I am eager to contribute to your team's projects and grow my skills in a professional environment.",
-      status: "accepted",
-      appliedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: "app4",
-      internshipId: "int3",
-      internshipTitle: "UX Research Intern",
-      applicantName: "David Kim",
-      applicantPhoto: "https://randomuser.me/api/portraits/men/36.jpg",
-      university: "Rhode Island School of Design",
-      email: "david.k@risd.edu",
-      phone: "+1 555-234-5678",
-      portfolio: "https://davidkim.design",
-      skills: ["User Research", "Prototyping", "Usability Testing", "Sketch"],
-      coverLetter: "I am interested in the UX Research Internship position at your company. My background in design thinking and user-centered research methods has prepared me to make meaningful contributions to your projects.",
-      status: "rejected",
-      appliedAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: "app5",
-      internshipId: "int2",
-      internshipTitle: "Data Science Intern",
-      applicantName: "Olivia Martinez",
-      applicantPhoto: "https://randomuser.me/api/portraits/women/25.jpg",
-      university: "Georgia Tech",
-      email: "o.martinez@gatech.edu",
-      phone: "+1 555-876-5432",
-      skills: ["R", "Statistics", "Data Visualization", "Big Data"],
-      coverLetter: "I am reaching out to express my enthusiasm for the Data Science Internship position. My academic background and practical experience in statistical analysis and data modeling align well with the requirements of this role.",
-      status: "pending",
-      appliedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  ]);
+  // Define the internships state
+  const [internships, setInternships] = useState<Internship[]>([]);
+  const [isLoadingInternships, setIsLoadingInternships] = useState(false);
+  const [internshipError, setInternshipError] = useState<string | null>(null);
+
+  // Real application state from API
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [applicationsByInternship, setApplicationsByInternship] = useState<{ [key: string]: Application[] }>({});
 
   // Application timeline data - applications per month
   const applicationTimelineData = [4, 6, 3, 7, 8, 12, 11, 9, 14, 17, 13, 15];
+
+  // State to track expanded internships
+  const [expandedInternships, setExpandedInternships] = useState<{ [key: string]: boolean }>({});
+
+  // Toggle expansion state for an internship
+  const toggleExpanded = (internshipId: number) => {
+    setExpandedInternships(prev => ({
+      ...prev,
+      [internshipId.toString()]: !prev[internshipId.toString()]
+    }));
+  };
 
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -393,47 +384,264 @@ export default function EmployerDashboard() {
     });
   };
 
-  // Update applicant status
-  const updateApplicantStatus = (applicationId: string, newStatus: string) => {
-    setApplications(applications.map(app => 
-      app.id === applicationId ? {...app, status: newStatus as any} : app
-    ));
-  };
+  // Fetch applications for all internships
+  useEffect(() => {
+    if (internships.length > 0) {
+      fetchApplicationsForInternships();
+    }
+  }, [internships]);
 
-  // View applicant details
-  const viewApplicantDetails = (applicationId: string) => {
-    const applicant = applications.find(app => app.id === applicationId);
-    if (applicant) {
-      setCurrentApplicant(applicant);
-      setInterviewDate(applicant.interviewDate || "");
-      setInterviewTime(applicant.interviewTime || "");
-      setApplicantNotes("");
-      setFeedbackRating(0);
-      setShowApplicantView(true);
+  // Helper function to fetch applications
+  const fetchApplicationsForInternships = async () => {
+    if (!user || !user.company_id) return;
+    
+    setIsLoadingApplications(true);
+    setApplicationError(null);
+    
+    try {
+      // Create a map of internshipId to applications
+      const appsByInternship: { [key: string]: Application[] } = {};
+      let allApplications: Application[] = [];
+      
+      // For each internship, fetch its applications
+      for (const internship of internships) {
+        try {
+          // Convert the internship.id to string for API call
+          const internshipId = internship.id.toString();
+          const response = await applicationApi.getApplications(internshipId);
+          
+          // Map the API response to our Application type
+          const mappedApplications = response.content.map((app: any) => ({
+            id: app.id.toString(),
+            internshipId: internshipId,
+            internshipTitle: internship.title,
+            applicantName: app.applicantName || "Applicant",
+            applicantPhoto: app.applicantPhoto || "https://randomuser.me/api/portraits/lego/1.jpg",
+            university: app.applicant?.university || "Unknown University",
+            email: app.applicantEmail || app.applicant?.email || "applicant@example.com",
+            phone: app.applicantPhoneNumber || app.applicant?.phone || "N/A",
+            portfolio: app.applicant?.website || undefined,
+            skills: app.applicant?.skills || [],
+            coverLetter: app.coverLetter || "No cover letter provided",
+            // Convert API status to our format (pending, interview, accepted, rejected)
+            status: app.status?.toLowerCase() === "pending" ? "pending" :
+                   app.status?.toLowerCase() === "interview_scheduled" ? "interview" :
+                   app.status?.toLowerCase() === "accepted" ? "accepted" : 
+                   app.status?.toLowerCase() === "rejected" ? "rejected" : "pending",
+            appliedAt: app.createdAt || new Date().toISOString(),
+            interviewDate: app.interviewDate,
+            interviewTime: app.interviewTime,
+            // Add the full applicant details if available
+            applicant: app.applicant
+          })) as Application[];
+          
+          appsByInternship[internshipId] = mappedApplications;
+          allApplications = [...allApplications, ...mappedApplications];
+        } catch (error) {
+          console.error(`Error fetching applications for internship ${internship.id}:`, error);
+          // Continue with other internships even if one fails
+        }
+      }
+      
+      setApplicationsByInternship(appsByInternship);
+      setApplications(allApplications);
+    } catch (error) {
+      console.error("Error fetching applications:", error);
+      setApplicationError("Failed to fetch applications");
+      toast({
+        title: "Error",
+        description: "Failed to fetch applications. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingApplications(false);
     }
   };
 
+  // Add a state to track when we need to refresh applications
+  const [refreshApplications, setRefreshApplications] = useState(false);
+
+  // Refresh applications when needed
+  useEffect(() => {
+    if (refreshApplications && internships.length > 0) {
+      fetchApplicationsForInternships();
+      setRefreshApplications(false);
+    }
+  }, [refreshApplications, internships]);
+
+  // Update applicant status with API call
+  const updateApplicantStatus = async (applicationId: string, newStatus: string) => {
+    try {
+      // Convert our status format to API format
+      let apiStatus: string;
+      
+      // Map frontend status to backend API status values
+      switch(newStatus) {
+        case "pending": 
+          apiStatus = "PENDING";
+          break;
+        case "interview": 
+          apiStatus = "INTERVIEW_SCHEDULED";
+          break;
+        case "accepted": 
+          apiStatus = "ACCEPTED";
+          break;
+        case "rejected": 
+          apiStatus = "REJECTED";
+          break;
+        default:
+          apiStatus = newStatus.toUpperCase();
+      }
+      
+      // For interview status, we might want to add interview date and time
+      let interviewDateToSend = "";
+      let interviewTimeToSend = "";
+      
+      if (newStatus === "interview") {
+        // Get the application to check if it has existing interview date and time
+        const app = applications.find(a => a.id === applicationId);
+        
+        // Use existing values or set defaults if needed
+        interviewDateToSend = app?.interviewDate || new Date().toISOString().split('T')[0]; // Today's date as default
+        interviewTimeToSend = app?.interviewTime || "09:00"; // Default time
+      }
+      
+      console.log(`Updating application ${applicationId} status to: ${apiStatus}`);
+      console.log(`With interview details - Date: ${interviewDateToSend}, Time: ${interviewTimeToSend}`);
+      
+      const result = await applicationApi.updateApplicationStatus(
+        applicationId, 
+        apiStatus, 
+        "",  // No feedback
+        newStatus === "interview" ? interviewDateToSend : undefined,
+        newStatus === "interview" ? interviewTimeToSend : undefined
+      );
+      console.log("API response:", result);
+      
+      // Update local state after successful API call
+      setApplications(applications.map(app => 
+        app.id === applicationId ? {
+          ...app, 
+          status: newStatus as any,
+          ...(newStatus === "interview" && {
+            interviewDate: interviewDateToSend,
+            interviewTime: interviewTimeToSend
+          })
+        } : app
+      ));
+      
+      // Mark applications for refresh to get latest data from backend
+      setRefreshApplications(true);
+        
+      toast({
+        title: "Status updated",
+        description: `Application status has been changed to ${newStatus} (API: ${apiStatus})`,
+      });
+    } catch (error) {
+      console.error("Error updating application status:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update application status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Set applicant being viewed and initialize form data
+  const viewApplicantDetails = (applicant: Application) => {
+    setCurrentApplicant(applicant);
+    // Use optional chaining to safely access feedback which may not be properly typed
+    setApplicantNotes(applicant?.feedback || "");
+    // Initialize interview date/time if they exist, or set defaults
+    setInterviewDate(applicant.interviewDate || new Date().toISOString().split('T')[0]);
+    setInterviewTime(applicant.interviewTime || "09:00");
+    setShowApplicantView(true);
+  };
+
+  // Function to view the full applicant profile in a new tab
+  const viewApplicantProfile = (applicantId: number) => {
+    window.open(`/candidates/${applicantId}`, '_blank');
+  };
+
   // Save applicant changes
-  const saveApplicantChanges = () => {
-    if (currentApplicant) {
+  const saveApplicantChanges = async () => {
+    if (!currentApplicant) return;
+    
+    try {
+      // Update status in API if a status is set
+      if (currentApplicant.status) {
+        // Map frontend status to backend API status values
+        let apiStatus: string;
+        
+        switch(currentApplicant.status) {
+          case "pending": 
+            apiStatus = "PENDING";
+            break;
+          case "interview": 
+            apiStatus = "INTERVIEW_SCHEDULED";
+            break;
+          case "accepted": 
+            apiStatus = "ACCEPTED";
+            break;
+          case "rejected": 
+            apiStatus = "REJECTED";
+            break;
+          default:
+            apiStatus = "PENDING"; // Default to pending if unknown status
+        }
+        
+        console.log(`Saving application ${currentApplicant.id} with status: ${apiStatus}`);
+        console.log(`Interview details - Date: ${interviewDate}, Time: ${interviewTime}`);
+        
+        const result = await applicationApi.updateApplicationStatus(
+          currentApplicant.id, 
+          apiStatus, 
+          applicantNotes, // Pass notes as feedback
+          interviewDate,  // Pass interview date 
+          interviewTime   // Pass interview time
+        );
+        console.log("Save application response:", result);
+      }
+      
+      // Update local state
       setApplications(applications.map(app => 
         app.id === currentApplicant.id 
           ? {...app, 
              status: currentApplicant.status, 
              interviewDate: interviewDate,
              interviewTime: interviewTime,
-             // In a real app, we would save notes and rating to the database
             } 
           : app
       ));
+      
+      // Mark applications for refresh to get latest data from backend
+      setRefreshApplications(true);
+      
+      toast({
+        title: "Changes saved",
+        description: `Applicant status set to: ${currentApplicant.status}`,
+      });
+      
       setShowApplicantView(false);
+    } catch (error) {
+      console.error("Error saving applicant changes:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save changes",
+        variant: "destructive",
+      });
     }
   };
 
   // Filter applications by status
-  const getFilteredApplications = (status: string | null) => {
-    if (!status) return applications;
-    return applications.filter(application => application.status === status);
+  const getFilteredApplications = (statusFilter: string | null) => {
+    if (!statusFilter || statusFilter === "all") return applications;
+    return applications.filter(application => application.status === statusFilter);
+  };
+
+  // Get applications for a specific internship
+  const getApplicationsForInternship = (internshipId: number) => {
+    return applicationsByInternship[internshipId.toString()] || [];
   };
 
   // Get internship by id
@@ -441,89 +649,59 @@ export default function EmployerDashboard() {
     return internships.find(internship => internship.id === id);
   };
 
-  // Define the internships state
-  const [internships, setInternships] = useState([
-    {
-      id: 1,
-      title: "UX/UI Design Intern",
-      department: "Design",
-      location: "Paris, France",
-      description: "We are looking for a passionate UX/UI Design Intern to join our growing design team. You will work closely with our experienced designers to create beautiful, functional interfaces for our web and mobile platforms.",
-      requirements: "Knowledge of design tools like Figma and Adobe XD. Understanding of user-centered design principles. Currently pursuing a degree in Design, HCI, or related field.",
-      workType: "on-site",
-      duration: "3 months",
-      compensation: "€800/month",
-      isPaid: true,
-      applicants: 8,
-      status: "active",
-      posted: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-      deadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 2,
-      title: "Frontend Developer Intern",
-      department: "Engineering",
-      location: "Paris, France",
-      description: "Join our engineering team as a Frontend Developer Intern. You will be involved in building and improving our user interfaces using React and TypeScript.",
-      requirements: "Familiarity with JavaScript, HTML, and CSS. Knowledge of React is a plus. Currently pursuing a degree in Computer Science or related field.",
-      workType: "hybrid",
-      duration: "6 months",
-      compensation: "€950/month",
-      isPaid: true,
-      applicants: 12,
-      status: "active",
-      posted: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-      deadline: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 3,
-      title: "Marketing Intern",
-      department: "Marketing",
-      location: "Remote",
-      description: "We're seeking a Marketing Intern to assist our marketing team with social media campaigns, content creation, and market research.",
-      requirements: "Strong written and verbal communication skills. Interest in digital marketing. Currently pursuing a degree in Marketing, Communications, or related field.",
-      workType: "remote",
-      duration: "4 months",
-      compensation: "€700/month",
-      isPaid: true,
-      applicants: 4,
-      status: "active",
-      posted: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      deadline: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 4,
-      title: "Data Analysis Intern",
-      department: "Business Intelligence",
-      location: "Lyon, France",
-      description: "Work with our BI team to analyze user data and provide insights that will help improve our product and business strategies.",
-      requirements: "Experience with Excel and basic SQL. Interest in data analysis. Currently pursuing a degree in Statistics, Mathematics, Business, or related field.",
-      workType: "on-site",
-      duration: "6 months",
-      compensation: "€900/month",
-      isPaid: true,
-      applicants: 0,
-      status: "closed",
-      posted: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
-      deadline: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 5,
-      title: "HR Intern",
-      department: "Human Resources",
-      location: "Paris, France",
-      description: "Join our HR team to assist with recruitment, onboarding, and other HR operations.",
-      requirements: "Excellent interpersonal skills. Knowledge of HR practices. Currently pursuing a degree in Human Resources, Business Administration, or related field.",
-      workType: "hybrid",
-      duration: "3 months",
-      compensation: "€750/month",
-      isPaid: true,
-      applicants: 0,
-      status: "closed",
-      posted: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
-      deadline: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    }
-  ]);
+  // Fetch internships for the company
+  useEffect(() => {
+    const fetchInternships = async () => {
+      if (!user || !user.company_id) return;
+      
+      setIsLoadingInternships(true);
+      setInternshipError(null);
+      
+      try {
+        console.log("user.company_id ", user.company_id);
+        const response = await internshipApi.getInternships(user.company_id.toString());
+        
+        if (response && response.content) {
+          // Map API response to our local type
+          const mappedInternships = response.content.map((item: any) => ({
+            id: item.id,
+            title: item.title || "Untitled Internship",
+            department: item.department || "General",
+            location: item.location || "Remote",
+            description: item.description || "",
+            requirements: item.requirements || "",
+            workType: item.workType || "on-site",
+            duration: item.duration || "",
+            compensation: item.compensation || "",
+            isPaid: item.isPaid !== undefined ? item.isPaid : true,
+            applicants: item.applicantsCount || 0,
+            status: item.status || "active",
+            posted: item.postedDate || new Date().toISOString(),
+            deadline: item.deadline || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            company: item.company
+          }));
+          
+          setInternships(mappedInternships);
+          
+          // Update stats with actual data
+          const activeCount = mappedInternships.filter((i) => i.status === "active").length;
+          // We could update the stats here if we want to display real numbers
+        }
+      } catch (error) {
+        console.error("Error fetching internships:", error);
+        setInternshipError("Failed to fetch internships");
+        toast({
+          title: "Error",
+          description: "Failed to fetch internships. Please try again later.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingInternships(false);
+      }
+    };
+    
+    fetchInternships();
+  }, [user]);
 
   if (!user || user.role !== "employer") {
     return (
@@ -709,7 +887,7 @@ export default function EmployerDashboard() {
                     <div 
                       key={application.id} 
                       className="flex items-center p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => viewApplicantDetails(application.id)}
+                      onClick={() => viewApplicantDetails(application)}
                     >
                       <Avatar className="h-10 w-10 mr-4">
                         <AvatarImage 
@@ -830,64 +1008,233 @@ export default function EmployerDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {internships.filter(internship => internship.status === "active").map((internship) => (
-                  <Card key={internship.id} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow">
-                    <CardHeader className="p-4 bg-[#0A77FF]/5">
-                      <div className="flex justify-between items-start">
-                        <CardTitle className="text-base font-medium">{internship.title}</CardTitle>
-                        <Badge 
-                          className="bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white"
+              <div className="space-y-4">
+                {isLoadingInternships ? (
+                  <div className="text-center py-12">
+                    <BriefcaseIcon className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4 animate-pulse" />
+                    <h3 className="text-lg font-medium mb-2">Loading internships...</h3>
+                    <p className="text-muted-foreground">Please wait while we fetch your internship listings.</p>
+                  </div>
+                ) : internshipError ? (
+                  <div className="text-center py-12">
+                    <BriefcaseIcon className="mx-auto h-12 w-12 text-red-400 mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Error loading internships</h3>
+                    <p className="text-muted-foreground mb-4">{internshipError}</p>
+                    <Button 
+                      onClick={() => {
+                        // Retry loading internships
+                        const fetchInternships = async () => {
+                          if (!user || !user.company_id) return;
+                          
+                          setIsLoadingInternships(true);
+                          setInternshipError(null);
+                          
+                          try {
+                            const response = await internshipApi.getInternships(user.company_id.toString());
+                            
+                            if (response && response.content) {
+                              // Map API response to our local type
+                              const mappedInternships = response.content.map((item: any) => ({
+                                id: item.id,
+                                title: item.title || "Untitled Internship",
+                                department: item.department || "General",
+                                location: item.location || "Remote",
+                                description: item.description || "",
+                                requirements: item.requirements || "",
+                                workType: item.workType || "on-site",
+                                duration: item.duration || "",
+                                compensation: item.compensation || "",
+                                isPaid: item.isPaid !== undefined ? item.isPaid : true,
+                                applicants: item.applicantsCount || 0,
+                                status: item.status || "active",
+                                posted: item.postedDate || new Date().toISOString(),
+                                deadline: item.deadline || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                                company: item.company
+                              }));
+                              
+                              setInternships(mappedInternships);
+                              
+                              // Update stats with actual data
+                              const activeCount = mappedInternships.filter((i) => i.status === "active").length;
+                              // We could update the stats here if we want to display real numbers
+                            }
+                          } catch (error) {
+                            console.error("Error fetching internships:", error);
+                            setInternshipError("Failed to fetch internships");
+                            toast({
+                              title: "Error",
+                              description: "Failed to fetch internships. Please try again later.",
+                              variant: "destructive",
+                            });
+                          } finally {
+                            setIsLoadingInternships(false);
+                          }
+                        };
+                        
+                        fetchInternships();
+                      }}
+                      className="gap-2 bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white"
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                ) : internships.length === 0 ? (
+                  <div className="text-center py-12">
+                    <BriefcaseIcon className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No internships yet</h3>
+                    <p className="text-muted-foreground mb-4">Create your first internship listing to start attracting candidates.</p>
+                    <Button 
+                      onClick={() => {
+                        setCurrentInternship(null);
+                        setIsViewMode(false);
+                        setShowInternshipForm(true);
+                      }}
+                      className="gap-2 bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Create New Listing
+                    </Button>
+                  </div>
+                ) : (
+                  internships.map((internship: any) => {
+                    const internshipApps = getApplicationsForInternship(internship.id);
+                    const isExpanded = expandedInternships[internship.id.toString()] || false;
+                    
+                    return (
+                      <div key={internship.id} className="border rounded-lg overflow-hidden">
+                        <div 
+                          className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                          onClick={() => toggleExpanded(internship.id)}
                         >
-                          Active
-                        </Badge>
+                          <div>
+                            <h3 className="font-medium">{internship.title}</h3>
+                            <div className="flex items-center text-sm text-muted-foreground mt-1">
+                              <span>{internship.department}</span>
+                              <span className="mx-2">•</span>
+                              <span>{internship.location}</span>
+                              {internship.deadline && (
+                                <>
+                                  <span className="mx-2">•</span>
+                                  <span>Deadline: {new Date(internship.deadline).toLocaleDateString()}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-center">
+                              <div className="font-semibold">{internshipApps.length}</div>
+                              <div className="text-xs text-muted-foreground">Applicants</div>
+                            </div>
+                            <Badge className={
+                              internship.status === "active" ? "bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white" :
+                              internship.status === "draft" ? "bg-muted text-muted-foreground" :
+                              "bg-neutral-200 text-neutral-700"
+                            }>
+                              {internship.status === "active" ? "Active" : 
+                               internship.status === "draft" ? "Draft" : "Closed"}
+                            </Badge>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="icon" onClick={(e) => {e.stopPropagation(); handleViewInternship(internship)}} className="h-8 w-8 text-neutral-600 hover:text-[#0A77FF] hover:bg-[#0A77FF]/5">
+                                <EyeIcon className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={(e) => {e.stopPropagation(); handleEditInternship(internship)}} className="h-8 w-8 text-neutral-600 hover:text-[#0A77FF] hover:bg-[#0A77FF]/5">
+                                <PencilIcon className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={(e) => {e.stopPropagation(); toggleInternshipStatus(internship)}}
+                                className="h-8 w-8 text-neutral-600 hover:text-[#0A77FF] hover:bg-[#0A77FF]/5"
+                              >
+                                {internship.status === "active" ? (
+                                  <XIcon className="h-4 w-4" />
+                                ) : (
+                                  <CheckIcon className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={(e) => {e.stopPropagation(); confirmDelete(internship)}}
+                                className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Applications list for this internship */}
+                        {isExpanded && (
+                          <div className="border-t bg-muted/20">
+                            <div className="p-3 bg-muted/30 border-b">
+                              <div className="flex justify-between items-center">
+                                <h4 className="text-sm font-medium">Applications for {internship.title}</h4>
+                                <Badge variant="outline" className="text-xs">{internshipApps.length} total</Badge>
+                              </div>
+                            </div>
+                            
+                            {isLoadingApplications ? (
+                              <div className="p-6 text-center">
+                                <UsersIcon className="mx-auto h-6 w-6 text-muted-foreground/30 mb-2 animate-pulse" />
+                                <p className="text-sm text-muted-foreground">Loading applications...</p>
+                              </div>
+                            ) : internshipApps.length === 0 ? (
+                              <div className="p-6 text-center">
+                                <UsersIcon className="mx-auto h-6 w-6 text-muted-foreground/30 mb-2" />
+                                <p className="text-sm text-muted-foreground">No applications received for this internship.</p>
+                              </div>
+                            ) : (
+                              <div className="divide-y divide-border">
+                                {internshipApps.map(app => (
+                                  <div 
+                                    key={app.id} 
+                                    className="p-3 hover:bg-muted/30 transition-colors cursor-pointer"
+                                    onClick={(e) => {e.stopPropagation(); viewApplicantDetails(app)} }
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center">
+                                        <Avatar className="h-8 w-8 mr-3">
+                                          <AvatarImage src={app.applicantPhoto} alt={app.applicantName} />
+                                          <AvatarFallback>{app.applicantName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                          <h5 className="font-medium text-sm">{app.applicantName}</h5>
+                                          <p className="text-xs text-muted-foreground">{app.university || app.applicant?.university || "Unknown"}</p>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        <p className="text-xs text-muted-foreground">Applied {formatRelativeTime(app.appliedAt)}</p>
+                                        <Badge 
+                                          className={
+                                            app.status === "pending" ? "bg-amber-100 text-amber-700" :
+                                            app.status === "interview" ? "bg-primary/10 text-primary" :
+                                            app.status === "accepted" ? "bg-green-100 text-green-700" :
+                                            "bg-red-100 text-red-700"
+                                          }
+                                        >
+                                          {app.status}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Display interview details for interview status */}
+                                    {app.status === "interview" && app.interviewDate && (
+                                      <div className="mt-2 ml-11 text-xs text-primary flex items-center">
+                                        <CalendarIcon className="h-3 w-3 mr-1" />
+                                        <span>Interview: {app.interviewDate} at {app.interviewTime || "TBD"}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <CardDescription className="flex items-center mt-1">
-                        <MapPinIcon className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
-                        {internship.location}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-2">
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-center text-sm">
-                          <UsersIcon className="h-4 w-4 mr-2 text-muted-foreground" /> 
-                          <span className="text-muted-foreground">
-                            {internship.applicants} applicants
-                          </span>
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <BriefcaseIcon className="h-4 w-4 mr-2 text-muted-foreground" /> 
-                          <span className="text-muted-foreground">
-                            {internship.workType.charAt(0).toUpperCase() + internship.workType.slice(1)}
-                          </span>
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <CalendarIcon className="h-4 w-4 mr-2 text-muted-foreground" /> 
-                          <span className="text-muted-foreground">
-                            Deadline: {new Date(internship.deadline).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                    <CardFooter className="p-4 pt-0 flex justify-end gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="h-8 gap-1 text-[#0A77FF] border-[#0A77FF] hover:bg-[#0A77FF]/5"
-                        onClick={() => handleViewInternship(internship)}
-                      >
-                        <EyeIcon className="h-4 w-4" /> View
-                      </Button>
-                      <Button 
-                        size="sm"
-                        className="h-8 gap-1 bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white"
-                        onClick={() => handleEditInternship(internship)}
-                      >
-                        <PencilIcon className="h-4 w-4" /> Edit
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
+                    );
+                  })
+                )}
               </div>
             </CardContent>
           </Card>
@@ -935,7 +1282,7 @@ export default function EmployerDashboard() {
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-center">
-                          <div className="font-semibold">{applications.filter(app => app.internshipId === internship.id).length}</div>
+                          <div className="font-semibold">{applications.filter(app => app.internshipId === internship.id.toString()).length}</div>
                           <div className="text-xs text-muted-foreground">Applicants</div>
                         </div>
                         <Badge className={
@@ -1188,37 +1535,67 @@ export default function EmployerDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  {internships
-                    .filter(internship => applications.filter(app => app.internshipId === internship.id).length > 0)
-                    .map(internship => {
-                      const internshipApps = applications.filter(app => app.internshipId === internship.id);
-                      return (
-                        <div key={internship.id} className="border rounded-lg p-4 hover:border-[#0A77FF]/50 hover:shadow-sm transition-all">
-                          <h3 className="font-medium text-sm">{internship.title}</h3>
-                          <div className="mt-2 flex items-center">
-                            <UsersIcon className="h-4 w-4 text-[#0A77FF] mr-2" />
-                            <span className="text-2xl font-bold">{internshipApps.length}</span>
-                          </div>
-                          <div className="mt-2 pt-2 border-t border-neutral-100">
-                            <div className="grid grid-cols-2 gap-1 text-xs">
-                              <div className="flex gap-1 items-center">
-                                <div className="w-2 h-2 rounded-full bg-amber-400"></div>
-                                <span>{internshipApps.filter(a => a.status === "pending").length} Pending</span>
-                              </div>
-                              <div className="flex gap-1 items-center">
-                                <div className="w-2 h-2 rounded-full bg-[#0A77FF]"></div>
-                                <span>{internshipApps.filter(a => a.status === "interview").length} Interview</span>
+                  {isLoadingApplications ? (
+                    <div className="col-span-4 text-center py-8">
+                      <UsersIcon className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2 animate-pulse" />
+                      <p className="text-muted-foreground">Loading applications data...</p>
+                    </div>
+                  ) : applicationError ? (
+                    <div className="col-span-4 text-center py-8">
+                      <UsersIcon className="mx-auto h-8 w-8 text-red-400 mb-2" />
+                      <p className="text-muted-foreground">Error loading applications: {applicationError}</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => {
+                          if (internships.length > 0) {
+                            setIsLoadingApplications(true);
+                            setApplicationError(null);
+                            // Trigger fetching applications
+                            fetchApplicationsForInternships();
+                          }
+                        }}
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  ) : (
+                    internships
+                      .filter(internship => {
+                        const apps = getApplicationsForInternship(internship.id);
+                        return apps.length > 0;
+                      })
+                      .map(internship => {
+                        const internshipApps = getApplicationsForInternship(internship.id);
+                        return (
+                          <div key={internship.id} className="border rounded-lg p-4 hover:border-[#0A77FF]/50 hover:shadow-sm transition-all">
+                            <h3 className="font-medium text-sm">{internship.title}</h3>
+                            <div className="mt-2 flex items-center">
+                              <UsersIcon className="h-4 w-4 text-[#0A77FF] mr-2" />
+                              <span className="text-2xl font-bold">{internshipApps.length}</span>
+                            </div>
+                            <div className="mt-2 pt-2 border-t border-neutral-100">
+                              <div className="grid grid-cols-2 gap-1 text-xs">
+                                <div className="flex gap-1 items-center">
+                                  <div className="w-2 h-2 rounded-full bg-amber-400"></div>
+                                  <span>{internshipApps.filter(a => a.status === "pending").length} Pending</span>
+                                </div>
+                                <div className="flex gap-1 items-center">
+                                  <div className="w-2 h-2 rounded-full bg-[#0A77FF]"></div>
+                                  <span>{internshipApps.filter(a => a.status === "interview").length} Interview</span>
+                                </div>
                               </div>
                             </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {internship.status === "active" ? "Active" : "Closed"} • {internship.location}
+                            </p>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {internship.status === "active" ? "Active" : "Closed"} • {internship.location}
-                          </p>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                  )}
                     
-                  {internships.filter(internship => applications.filter(app => app.internshipId === internship.id).length > 0).length === 0 && (
+                  {!isLoadingApplications && !applicationError && internships.filter(internship => getApplicationsForInternship(internship.id).length > 0).length === 0 && (
                     <div className="col-span-4 text-center py-8">
                       <UsersIcon className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
                       <p className="text-muted-foreground">No applications received yet for your internship listings.</p>
@@ -1309,7 +1686,7 @@ export default function EmployerDashboard() {
                     <div 
                       key={application.id} 
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => viewApplicantDetails(application.id)}
+                      onClick={() => viewApplicantDetails(application)}
                     >
                       <div className="flex items-center">
                         <Avatar className="h-10 w-10 mr-4">
@@ -1381,156 +1758,220 @@ export default function EmployerDashboard() {
 
             {/* Applicant Details Dialog */}
             <Dialog open={showApplicantView} onOpenChange={setShowApplicantView}>
-              <DialogContent className="sm:max-w-[700px]">
+              <DialogContent className="max-w-3xl">
                 {currentApplicant && (
                   <>
                     <DialogHeader>
-                      <DialogTitle className="flex items-center gap-2">
-                        <div className="h-10 w-10 rounded-full overflow-hidden">
-                          <img src={currentApplicant.applicantPhoto} alt={currentApplicant.applicantName} className="h-full w-full object-cover" />
-                        </div>
-                        <div>
-                          {currentApplicant.applicantName}
-                          <Badge 
-                            variant={
-                              currentApplicant.status === "pending" ? "secondary" :
-                              currentApplicant.status === "interview" ? "default" :
-                              currentApplicant.status === "accepted" ? "default" :
-                              "outline"
-                            }
-                            className={
-                              currentApplicant.status === "pending" ? "ml-2" :
-                              currentApplicant.status === "interview" ? "bg-primary text-primary-foreground ml-2" :
-                              currentApplicant.status === "accepted" ? "bg-green-600 hover:bg-green-700 text-white ml-2" :
-                              "bg-red-100 text-red-700 ml-2"
-                            }
-                          >
-                            {currentApplicant.status === "pending" ? "Pending Review" :
-                              currentApplicant.status === "interview" ? "Interview" :
-                              currentApplicant.status === "accepted" ? "Accepted" : "Rejected"}
-                          </Badge>
-                        </div>
-                      </DialogTitle>
-                      <DialogDescription>
-                        Application for {currentApplicant.internshipTitle} • Applied {formatRelativeTime(currentApplicant.appliedAt)}
-                      </DialogDescription>
+                      <DialogTitle>Applicant Details</DialogTitle>
+                      <DialogDescription>Review and manage application from {currentApplicant.applicantName}</DialogDescription>
                     </DialogHeader>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <h3 className="text-sm font-medium mb-2">Applicant Information</h3>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex">
-                            <span className="w-20 text-muted-foreground">University:</span>
-                            <span>{currentApplicant.university}</span>
-                          </div>
-                          <div className="flex">
-                            <span className="w-20 text-muted-foreground">Email:</span>
-                            <span>{currentApplicant.email}</span>
-                          </div>
-                          <div className="flex">
-                            <span className="w-20 text-muted-foreground">Phone:</span>
-                            <span>{currentApplicant.phone}</span>
-                          </div>
-                          {currentApplicant.portfolio && (
-                            <div className="flex">
-                              <span className="w-20 text-muted-foreground">Portfolio:</span>
-                              <a href={currentApplicant.portfolio} target="_blank" rel="noopener noreferrer" className="text-[#0A77FF] hover:underline">
-                                View Portfolio
-                              </a>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
+                      <div className="md:col-span-1 space-y-4">
+                        <div className="text-center">
+                          <Avatar className="h-24 w-24 mx-auto">
+                            <AvatarImage 
+                              src={currentApplicant.applicantPhoto || currentApplicant.applicant?.photo} 
+                              alt={currentApplicant.applicantName} 
+                            />
+                            <AvatarFallback className="text-xl">{currentApplicant.applicantName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                          </Avatar>
+                          <h2 className="text-lg font-semibold mt-3">{currentApplicant.applicantName}</h2>
+                          <p className="text-sm text-muted-foreground">
+                            {currentApplicant.applicant?.title || "Applicant"}
+                          </p>
+                        </div>
+                        
+                        <div className="border rounded-lg p-4 space-y-3">
+                          <h3 className="font-medium text-sm">Contact Information</h3>
+                          <div className="text-sm space-y-2">
+                            <div className="flex items-center gap-2">
+                              <BuildingIcon className="h-4 w-4 text-muted-foreground" />
+                              <span>{currentApplicant.university || currentApplicant.applicant?.university || "Unknown University"}</span>
                             </div>
-                          )}
+                            <div className="flex items-center gap-2">
+                              <MapPinIcon className="h-4 w-4 text-muted-foreground" />
+                              <span>{currentApplicant.applicant?.location || "Location not provided"}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <MailIcon className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-primary underline">
+                                <a href={`mailto:${currentApplicant.email}`}>{currentApplicant.email}</a>
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <PhoneIcon className="h-4 w-4 text-muted-foreground" />
+                              <span>{currentApplicant.phone || currentApplicant.applicant?.phone || "Phone not provided"}</span>
+                            </div>
+                            {(currentApplicant.portfolio || currentApplicant.applicant?.website) && (
+                              <div className="flex items-center gap-2">
+                                <GlobeIcon className="h-4 w-4 text-muted-foreground" />
+                                <a 
+                                  href={currentApplicant.portfolio || currentApplicant.applicant?.website} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-primary underline"
+                                >
+                                  Portfolio / Website
+                                </a>
+                              </div>
+                            )}
+                          </div>
                         </div>
-
-                        <h3 className="text-sm font-medium mt-4 mb-2">Skills</h3>
-                        <div className="flex flex-wrap gap-1">
-                          {currentApplicant.skills.map((skill: string, index: number) => (
-                            <Badge key={index} variant="outline" className="bg-[#0A77FF]/5 text-[#0A77FF] border-[#0A77FF]/20">{skill}</Badge>
-                          ))}
-                        </div>
-
-                        <h3 className="text-sm font-medium mt-4 mb-2">Cover Letter</h3>
-                        <div className="bg-muted/50 p-3 rounded-md text-sm max-h-[150px] overflow-y-auto">
-                          {currentApplicant.coverLetter}
-                        </div>
+                        
+                        {currentApplicant.applicant && (
+                          <div className="border rounded-lg p-4 space-y-3">
+                            <h3 className="font-medium text-sm">Candidate Profile</h3>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              {currentApplicant.applicant.educationCount !== undefined && (
+                                <div className="bg-muted/50 p-2 rounded-lg text-center">
+                                  <div className="font-medium">{currentApplicant.applicant.educationCount}</div>
+                                  <div className="text-xs text-muted-foreground">Education</div>
+                                </div>
+                              )}
+                              {currentApplicant.applicant.experienceCount !== undefined && (
+                                <div className="bg-muted/50 p-2 rounded-lg text-center">
+                                  <div className="font-medium">{currentApplicant.applicant.experienceCount}</div>
+                                  <div className="text-xs text-muted-foreground">Experience</div>
+                                </div>
+                              )}
+                              {currentApplicant.applicant.certificationsCount !== undefined && (
+                                <div className="bg-muted/50 p-2 rounded-lg text-center">
+                                  <div className="font-medium">{currentApplicant.applicant.certificationsCount}</div>
+                                  <div className="text-xs text-muted-foreground">Certifications</div>
+                                </div>
+                              )}
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full mt-2"
+                              onClick={() => currentApplicant.applicant?.id && viewApplicantProfile(currentApplicant.applicant.id)}
+                            >
+                              <UserIcon className="h-4 w-4 mr-2" />
+                              View Full Profile
+                            </Button>
+                          </div>
+                        )}
                       </div>
-
-                      <div>
-                        <h3 className="text-sm font-medium mb-2">Interview Schedule</h3>
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="interviewDate">Date</Label>
-                            <Input 
-                              id="interviewDate"
-                              type="date"
-                              value={interviewDate}
-                              onChange={(e) => setInterviewDate(e.target.value)}
-                              className="border-input focus-visible:ring-[#0A77FF]"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="interviewTime">Time</Label>
-                            <Input 
-                              id="interviewTime"
-                              type="time"
-                              value={interviewTime}
-                              onChange={(e) => setInterviewTime(e.target.value)}
-                              className="border-input focus-visible:ring-[#0A77FF]"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2 mb-4">
-                          <Label htmlFor="feedback">Feedback & Notes</Label>
-                          <Textarea 
-                            id="feedback"
-                            placeholder="Add your notes about this candidate..."
-                            rows={5}
-                            value={applicantNotes}
-                            onChange={(e) => setApplicantNotes(e.target.value)}
-                            className="border-input focus-visible:ring-[#0A77FF]"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Rating</Label>
-                          <div className="flex gap-1">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <button
-                                key={star}
-                                type="button"
-                                className={`text-2xl ${feedbackRating >= star ? 'text-yellow-400' : 'text-gray-300'}`}
-                                onClick={() => setFeedbackRating(star)}
+                      
+                      <div className="md:col-span-2 space-y-4">
+                        <div className="border rounded-lg p-4">
+                          <h3 className="font-medium mb-2">Applied Position</h3>
+                          <div className="bg-muted/30 p-3 rounded-md">
+                            <div className="font-medium">{currentApplicant.internshipTitle}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">
+                                Applied {formatRelativeTime(currentApplicant.appliedAt)}
+                              </span>
+                              <span className="text-muted-foreground">•</span>
+                              <Badge 
+                                className={
+                                  currentApplicant.status === "pending" ? "bg-amber-100 text-amber-700" :
+                                  currentApplicant.status === "interview" ? "bg-primary/10 text-primary" :
+                                  currentApplicant.status === "accepted" ? "bg-green-100 text-green-700" :
+                                  "bg-red-100 text-red-700"
+                                }
                               >
-                                ★
-                              </button>
-                            ))}
+                                {currentApplicant.status}
+                              </Badge>
+                            </div>
                           </div>
                         </div>
-
-                        <div className="mt-4 pt-4 border-t">
-                          <h3 className="text-sm font-medium mb-2">Application Status</h3>
-                          <Select 
-                            defaultValue={currentApplicant.status}
-                            onValueChange={(value: "pending" | "interview" | "accepted" | "rejected") => {
-                              updateApplicantStatus(currentApplicant.id, value);
-                              setCurrentApplicant({...currentApplicant, status: value});
-                            }}
-                          >
-                            <SelectTrigger className="w-full border-input focus-visible:ring-primary">
-                              <SelectValue placeholder="Change status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">Pending Review</SelectItem>
-                              <SelectItem value="interview">Schedule Interview</SelectItem>
-                              <SelectItem value="accepted">Accept Candidate</SelectItem>
-                              <SelectItem value="rejected">Reject Candidate</SelectItem>
-                            </SelectContent>
-                          </Select>
+                        
+                        <div className="border rounded-lg p-4">
+                          <h3 className="font-medium mb-2">Cover Letter</h3>
+                          <div className="bg-muted/30 p-3 rounded-md max-h-40 overflow-y-auto text-sm">
+                            {currentApplicant.coverLetter || "No cover letter provided"}
+                          </div>
+                        </div>
+                        
+                        {currentApplicant.applicant?.about && (
+                          <div className="border rounded-lg p-4">
+                            <h3 className="font-medium mb-2">About</h3>
+                            <div className="bg-muted/30 p-3 rounded-md max-h-40 overflow-y-auto text-sm">
+                              {currentApplicant.applicant.about}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="border rounded-lg p-4">
+                          <h3 className="font-medium mb-3">Application Status</h3>
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-3 gap-2">
+                              <Button
+                                variant={currentApplicant.status === "pending" ? "default" : "outline"}
+                                className={currentApplicant.status === "pending" ? "bg-amber-500 hover:bg-amber-600" : ""}
+                                onClick={() => setCurrentApplicant({...currentApplicant, status: "pending"})}
+                              >
+                                Pending
+                              </Button>
+                              <Button
+                                variant={currentApplicant.status === "interview" ? "default" : "outline"}
+                                className={currentApplicant.status === "interview" ? "bg-primary hover:bg-primary/90" : ""}
+                                onClick={() => setCurrentApplicant({...currentApplicant, status: "interview"})}
+                              >
+                                Interview
+                              </Button>
+                              <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                  variant={currentApplicant.status === "accepted" ? "default" : "outline"}
+                                  className={currentApplicant.status === "accepted" ? "bg-green-500 hover:bg-green-600" : ""}
+                                  onClick={() => setCurrentApplicant({...currentApplicant, status: "accepted"})}
+                                >
+                                  Accept
+                                </Button>
+                                <Button
+                                  variant={currentApplicant.status === "rejected" ? "default" : "outline"}
+                                  className={currentApplicant.status === "rejected" ? "bg-red-500 hover:bg-red-600" : ""}
+                                  onClick={() => setCurrentApplicant({...currentApplicant, status: "rejected"})}
+                                >
+                                  Reject
+                                </Button>
+                              </div>
+                            </div>
+                            
+                            {currentApplicant.status === "interview" && (
+                              <div className="border-t pt-3 mt-3">
+                                <h4 className="text-sm font-medium mb-2">Schedule Interview</h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="interviewDate">Date</Label>
+                                    <Input
+                                      id="interviewDate"
+                                      type="date"
+                                      value={interviewDate}
+                                      onChange={(e) => setInterviewDate(e.target.value)}
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="interviewTime">Time</Label>
+                                    <Input
+                                      id="interviewTime"
+                                      type="time"
+                                      value={interviewTime}
+                                      onChange={(e) => setInterviewTime(e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="border-t pt-3 mt-3">
+                              <h4 className="text-sm font-medium mb-2">Feedback Notes</h4>
+                              <Textarea
+                                placeholder="Add private notes about this applicant..."
+                                value={applicantNotes}
+                                onChange={(e) => setApplicantNotes(e.target.value)}
+                                className="min-h-[100px]"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-
+                    
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setShowApplicantView(false)}>Cancel</Button>
                       <Button 
@@ -1553,13 +1994,13 @@ export default function EmployerDashboard() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {internships.map(internship => {
-                    const internshipApplications = applications.filter(app => app.internshipId === internship.id);
-                    const pendingCount = internshipApplications.filter(app => app.status === 'pending').length;
-                    const interviewCount = internshipApplications.filter(app => app.status === 'interview').length;
-                    const acceptedCount = internshipApplications.filter(app => app.status === 'accepted').length;
-                    const rejectedCount = internshipApplications.filter(app => app.status === 'rejected').length;
+                    const internshipApps = applications.filter(app => app.internshipId === internship.id.toString());
+                    const pendingCount = internshipApps.filter(app => app.status === 'pending').length;
+                    const interviewCount = internshipApps.filter(app => app.status === 'interview').length;
+                    const acceptedCount = internshipApps.filter(app => app.status === 'accepted').length;
+                    const rejectedCount = internshipApps.filter(app => app.status === 'rejected').length;
                     
-                    if (internshipApplications.length === 0) return null;
+                    if (internshipApps.length === 0) return null;
                     
                     return (
                       <Card key={internship.id} className="border">
@@ -1571,25 +2012,25 @@ export default function EmployerDashboard() {
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                               <span>Total Applications</span>
-                              <span className="text-[#0A77FF] font-medium">{internshipApplications.length}</span>
+                              <span className="text-[#0A77FF] font-medium">{internshipApps.length}</span>
                             </div>
                             <div className="h-1.5 w-full bg-[#0A77FF]/10 rounded-full overflow-hidden">
                               <div className="flex h-full">
                                 <div 
                                   className="bg-amber-500 h-full" 
-                                  style={{ width: `${(pendingCount / internshipApplications.length) * 100}%` }}
+                                  style={{ width: `${(pendingCount / internshipApps.length) * 100}%` }}
                                 ></div>
                                 <div 
                                   className="bg-[#0A77FF] h-full" 
-                                  style={{ width: `${(interviewCount / internshipApplications.length) * 100}%` }}
+                                  style={{ width: `${(interviewCount / internshipApps.length) * 100}%` }}
                                 ></div>
                                 <div 
                                   className="bg-green-500 h-full" 
-                                  style={{ width: `${(acceptedCount / internshipApplications.length) * 100}%` }}
+                                  style={{ width: `${(acceptedCount / internshipApps.length) * 100}%` }}
                                 ></div>
                                 <div 
                                   className="bg-red-500 h-full" 
-                                  style={{ width: `${(rejectedCount / internshipApplications.length) * 100}%` }}
+                                  style={{ width: `${(rejectedCount / internshipApps.length) * 100}%` }}
                                 ></div>
                               </div>
                             </div>

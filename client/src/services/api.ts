@@ -66,7 +66,18 @@ export const internshipApi = {
       }
 
       const data = await response.json();
-      return data;
+      
+      if (data.success) {
+        // Return data in the expected format
+        return {
+          content: data.data || [],
+          currentPage: data.currentPage,
+          totalItems: data.totalItems,
+          totalPages: data.totalPages
+        };
+      } else {
+        throw new Error(data.message || 'Failed to fetch internships');
+      } 
     } catch (error) {
       console.error('Error fetching internships:', error);
       throw error;
@@ -319,15 +330,31 @@ export const applicationApi = {
       }
 
       const data = await response.json();
-      return data;
+      
+      // Format to match PaginatedResponse interface
+      return {
+        content: data.applications || [],
+        currentPage: data.currentPage,
+        totalItems: data.totalItems,
+        totalPages: data.totalPages
+      };
     } catch (error) {
       console.error('Error fetching applications:', error);
       throw error;
     }
   },
 
-  updateApplicationStatus: async (applicationId: string, status: string, feedback?: string): Promise<Application> => {
+  updateApplicationStatus: async (applicationId: string, status: string, feedback?: string, interviewDate?: string, interviewTime?: string): Promise<Application> => {
     try {
+      console.log(`API call: Updating application ${applicationId} to status ${status}`);
+      const requestPayload = { 
+        status, 
+        ...(feedback && { feedback }),
+        ...(interviewDate && { interviewDate }),
+        ...(interviewTime && { interviewTime })
+      };
+      console.log('Request payload:', requestPayload);
+      
       const response = await fetch(
         `${API_BASE_URL}/api/applications/${applicationId}/status`,
         {
@@ -336,15 +363,29 @@ export const applicationApi = {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ status, feedback }),
+          body: JSON.stringify(requestPayload),
         }
       );
 
+      // Log the response status
+      console.log(`Response status: ${response.status} ${response.statusText}`);
+      
+      // Try to get response body even if it's an error
+      const responseText = await response.text();
+      console.log('Response body:', responseText);
+      
+      // Parse JSON if possible
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response as JSON:', e);
+      }
+      
       if (!response.ok) {
         throw new Error(`Failed to update application status: ${response.statusText}`);
       }
 
-      const data = await response.json();
       return data;
     } catch (error) {
       console.error('Error updating application status:', error);

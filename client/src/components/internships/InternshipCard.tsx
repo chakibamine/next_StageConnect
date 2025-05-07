@@ -28,12 +28,17 @@ const InternshipCard = ({ internship }: InternshipCardProps) => {
     return count === 1 ? "1 applicant" : `${count} applicants`;
   };
 
-  // Helper to safely format createdAt
+  // Helper to safely format date
   let postedString = "N/A";
   if (internship.createdAt) {
     const createdDate = new Date(internship.createdAt);
     if (!isNaN(createdDate.getTime())) {
       postedString = formatDistanceToNow(createdDate, { addSuffix: true });
+    }
+  } else if (internship.posted) {
+    const postedDate = new Date(internship.posted);
+    if (!isNaN(postedDate.getTime())) {
+      postedString = formatDistanceToNow(postedDate, { addSuffix: true });
     }
   }
 
@@ -55,13 +60,17 @@ const InternshipCard = ({ internship }: InternshipCardProps) => {
               <BookmarkIcon className={isSaved ? "fill-primary-600" : ""} />
             </Button>
           </div>
-          <p className="text-sm text-neutral-600">{internship.company} • {internship.location}</p>
+          <p className="text-sm text-neutral-600">
+            {typeof internship.company === 'object' 
+              ? internship.company.name 
+              : internship.company} • {internship.location}
+          </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Badge variant="outline" className="bg-primary-50 text-primary-700 hover:bg-primary-100 border-primary-200">
               {internship.duration}
             </Badge>
             <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-100 border-green-200">
-              {internship.isPaid ? "Paid" : "Unpaid"}
+              {internship.isPaid !== undefined ? (internship.isPaid ? "Paid" : "Unpaid") : "Compensation Available"}
             </Badge>
             <Badge variant="outline" className="bg-neutral-100 text-neutral-700 hover:bg-neutral-200 border-neutral-300">
               {internship.workType}

@@ -39,12 +39,12 @@ const QuickActions = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {actions.map((action, index) => (
             <Link key={index} href={action.href}>
-              <a className="flex flex-col items-center p-4 rounded-lg border border-neutral-200 hover:border-primary-300 hover:bg-primary-50 transition-colors">
+              <div className="flex flex-col items-center p-4 rounded-lg border border-neutral-200 hover:border-primary-300 hover:bg-primary-50 transition-colors">
                 <div className={`w-12 h-12 rounded-full ${action.color} flex items-center justify-center mb-2`}>
                   {action.icon}
                 </div>
                 <span className="text-sm font-medium text-center">{action.title}</span>
-              </a>
+              </div>
             </Link>
           ))}
         </div>
