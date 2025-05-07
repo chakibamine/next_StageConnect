@@ -127,6 +127,191 @@ interface EmployerProfileProps {
   companyId?: string;
 }
 
+// Add API service for achievements
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
+const achievementApi = {
+  getAchievements: async (companyId: string) => {
+    try {
+      console.log('Fetching achievements for company:', companyId);
+      const response = await fetch(`${API_BASE_URL}/api/companies/${companyId}/achievements`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch achievements: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Raw achievements response:', result);
+
+      // Handle both possible response formats
+      const achievements = result.data || result;
+      console.log('Processed achievements:', achievements);
+      return Array.isArray(achievements) ? achievements : [];
+    } catch (error) {
+      console.error('Error in getAchievements:', error);
+      return [];
+    }
+  },
+
+  createAchievement: async (companyId: string, achievement: any) => {
+    const response = await fetch(`${API_BASE_URL}/api/companies/${companyId}/achievements`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(achievement),
+      credentials: "include",
+    });
+    return response.json();
+  },
+
+  updateAchievement: async (companyId: string, achievementId: number, achievement: any) => {
+    const response = await fetch(`${API_BASE_URL}/api/companies/${companyId}/achievements/${achievementId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(achievement),
+      credentials: "include",
+    });
+    return response.json();
+  },
+
+  deleteAchievement: async (companyId: string, achievementId: number) => {
+    const response = await fetch(`${API_BASE_URL}/api/companies/${companyId}/achievements/${achievementId}`, {
+      method: 'DELETE',
+      credentials: "include",
+    });
+    return response.json();
+  }
+};
+
+// Update project API service to match achievements
+const projectApi = {
+  getProjects: async (companyId: string) => {
+    try {
+      console.log('Fetching projects for company:', companyId);
+      const response = await fetch(`${API_BASE_URL}/api/companies/${companyId}/projects`, {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch projects: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Raw projects response:', result);
+
+      // Handle both possible response formats
+      const projects = result.data || result;
+      console.log('Processed projects:', projects);
+      return Array.isArray(projects) ? projects : [];
+    } catch (error) {
+      console.error('Error in getProjects:', error);
+      return [];
+    }
+  },
+
+  createProject: async (companyId: string, project: any) => {
+    const response = await fetch(`${API_BASE_URL}/api/companies/${companyId}/projects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(project),
+      credentials: "include",
+    });
+    return response.json();
+  },
+
+  updateProject: async (companyId: string, projectId: number, project: any) => {
+    const response = await fetch(`${API_BASE_URL}/api/companies/${companyId}/projects/${projectId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(project),
+      credentials: "include",
+    });
+    return response.json();
+  },
+
+  deleteProject: async (companyId: string, projectId: number) => {
+    const response = await fetch(`${API_BASE_URL}/api/companies/${companyId}/projects/${projectId}`, {
+      method: 'DELETE',
+      credentials: "include",
+    });
+    return response.json();
+  }
+};
+
+// Simplify internship API service
+const internshipApi = {
+  getInternships: async (companyId: string) => {
+    try {
+      console.log('Fetching internships for company:', companyId);
+      const response = await fetch(`${API_BASE_URL}/api/companies/${companyId}/internships`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch internships: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Raw internships response:', result);
+
+      // Handle both possible response formats
+      const internships = result.data || result;
+      console.log('Processed internships:', internships);
+      return Array.isArray(internships) ? internships : [];
+    } catch (error) {
+      console.error('Error in getInternships:', error);
+      return [];
+    }
+  },
+
+  createInternship: async (companyId: string, internship: any) => {
+    const response = await fetch(`${API_BASE_URL}/api/companies/${companyId}/internships`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(internship),
+      credentials: "include",
+    });
+    return response.json();
+  },
+
+  updateInternship: async (companyId: string, internshipId: number, internship: any) => {
+    const response = await fetch(`${API_BASE_URL}/api/companies/${companyId}/internships/${internshipId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(internship),
+      credentials: "include",
+    });
+    return response.json();
+  },
+
+  deleteInternship: async (companyId: string, internshipId: number) => {
+    const response = await fetch(`${API_BASE_URL}/api/companies/${companyId}/internships/${internshipId}`, {
+      method: 'DELETE',
+      credentials: "include",
+    });
+    return response.json();
+  },
+
+  updateInternshipStatus: async (companyId: string, internshipId: number, status: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/companies/${companyId}/internships/${internshipId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+      credentials: "include",
+    });
+    return response.json();
+  }
+};
+
 const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfileProps) => {
   const [, params] = useRoute("/company/:id");
   const profileId = id || params?.id || companyId || "1"; // Provide a default value
@@ -381,9 +566,6 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
     responsibility: company.name + " is committed to making a positive impact beyond our business operations. We have implemented sustainable practices throughout our organization, supported local community initiatives, and established a foundation that focuses on improving technology education and access for underserved communities."
   });
   
-  // Add API base URL
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/';
-
   // Fetch company data
   const fetchCompanyData = async (id: string) => {
     try {
@@ -479,23 +661,53 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
     }
   };
 
-  // Update useEffect to fetch company data
+  // Update useEffect to handle all data fetching consistently
   useEffect(() => {
-    document.title = `${company.name} | StageConnect`;
-    
-    if (profileId) {
-      fetchCompanyData(profileId);
-      const parsedProfileId = parseInt(profileId);
-      setIsOwnProfile(user?.company_id === parsedProfileId);
-    } else {
-      setIsOwnProfile(true);
-      if (user) {
-        setCompany({
-          ...company,
-          name: user.company || company.name,
+    const fetchAllData = async () => {
+      if (!profileId) {
+        console.log('No profile ID available');
+        return;
+      }
+
+      console.log('Starting to fetch data for profile:', profileId);
+
+      try {
+        // Fetch company data
+        await fetchCompanyData(profileId);
+        console.log('Company data fetched successfully');
+
+        // Fetch achievements
+        console.log('Fetching achievements...');
+        const achievementsData = await achievementApi.getAchievements(profileId);
+        console.log('Achievements data received:', achievementsData);
+        setAchievements(achievementsData);
+
+        // Fetch projects
+        console.log('Fetching projects...');
+        const projectsData = await projectApi.getProjects(profileId);
+        console.log('Projects data received:', projectsData);
+        setProjects(projectsData);
+
+        // Set profile ownership
+        const parsedProfileId = parseInt(profileId);
+        setIsOwnProfile(user?.company_id === parsedProfileId);
+        console.log('Profile ownership set:', user?.company_id === parsedProfileId);
+
+      } catch (error) {
+        console.error('Error fetching profile data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch profile data. Please try refreshing the page.",
+          variant: "destructive",
         });
       }
-    }
+    };
+
+    // Set page title
+    document.title = `${company.name} | StageConnect`;
+    
+    // Execute data fetching
+    fetchAllData();
   }, [profileId, user, company.name]);
 
   const handleAddPost = (newPost: Post) => {
@@ -581,7 +793,8 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
     setShowInternshipDialog(true);
   };
 
-  const handleSaveInternship = () => {
+  // Update handleSaveInternship to use the API
+  const handleSaveInternship = async () => {
     if (!internshipForm.title || !internshipForm.department) {
       toast({
         title: "Missing information",
@@ -591,64 +804,67 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
       return;
     }
 
-    if (currentInternship) {
-      // Update existing internship
-      const updatedInternships = internships.map(internship => 
-        internship.id === currentInternship.id 
-          ? { 
-              ...internship, 
-              ...internshipForm,
-              deadline: internshipForm.deadline 
-                ? new Date(internshipForm.deadline).toISOString() 
-                : internship.deadline
-            } 
-          : internship
-      );
-      setInternships(updatedInternships);
+    try {
+      if (currentInternship) {
+        // Update existing internship
+        const result = await internshipApi.updateInternship(profileId, currentInternship.id, internshipForm);
+        if (result.success) {
+          setInternships(internships.map(internship => 
+            internship.id === currentInternship.id ? result.data : internship
+          ));
+          toast({
+            title: "Success",
+            description: "Internship updated successfully",
+          });
+        }
+      } else {
+        // Create new internship
+        const result = await internshipApi.createInternship(profileId, internshipForm);
+        if (result.success) {
+          setInternships([...internships, result.data]);
+          toast({
+            title: "Success",
+            description: "Internship created successfully",
+          });
+        }
+      }
+      setShowInternshipDialog(false);
+    } catch (error) {
+      console.error('Error saving internship:', error);
       toast({
-        title: "Internship updated",
-        description: `${internshipForm.title} has been updated successfully.`,
-      });
-    } else {
-      // Add new internship
-      const newInternship = {
-        id: internships.length + 1,
-        ...internshipForm,
-        applicants: 0,
-        status: "active",
-        posted: new Date().toISOString(),
-        deadline: internshipForm.deadline 
-          ? new Date(internshipForm.deadline).toISOString() 
-          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      };
-      setInternships([...internships, newInternship]);
-      toast({
-        title: "Internship created",
-        description: `${internshipForm.title} has been posted successfully.`,
+        title: "Error",
+        description: "Failed to save internship",
+        variant: "destructive",
       });
     }
-
-    setShowInternshipDialog(false);
   };
 
-  const toggleInternshipStatus = (id: number) => {
-    const updatedInternships = internships.map(internship => {
-      if (internship.id === id) {
-        const newStatus = internship.status === "active" ? "closed" : "active";
-        return { ...internship, status: newStatus };
+  // Update toggleInternshipStatus to use the API
+  const toggleInternshipStatus = async (id: number) => {
+    try {
+      const internship = internships.find(int => int.id === id);
+      if (!internship) return;
+
+      const newStatus = internship.status === "active" ? "closed" : "active";
+      const result = await internshipApi.updateInternshipStatus(profileId, id, newStatus);
+      
+      if (result.success) {
+        setInternships(internships.map(int => 
+          int.id === id ? { ...int, status: newStatus } : int
+        ));
+        toast({
+          title: `Internship ${newStatus}`,
+          description: `${internship.title} is now ${newStatus}.`,
+        });
       }
-      return internship;
-    });
-    
-    setInternships(updatedInternships);
-    
-    const internship = internships.find(int => int.id === id);
-    const newStatus = internship?.status === "active" ? "closed" : "active";
-    
-    toast({
-      title: `Internship ${newStatus}`,
-      description: `${internship?.title} is now ${newStatus}.`,
-    });
+    } catch (error) {
+      console.error('Error updating internship status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update internship status",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleInternshipInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -699,133 +915,172 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
     setShowItemDialog(true);
   };
 
-  const handleSaveItem = () => {
+  const handleSaveItem = async () => {
     if (!itemType) return;
 
-    // Validate form
-    if (!itemForm.title && itemType !== "client") {
+    try {
+      if (itemType === "achievement") {
+        if (currentItem) {
+          // Update existing achievement
+          const result = await achievementApi.updateAchievement(profileId, currentItem.id, itemForm);
+          if (result.success) {
+            setAchievements(achievements.map(a => a.id === currentItem.id ? result.data : a));
+            toast({
+              title: "Success",
+              description: "Achievement updated successfully",
+            });
+          }
+        } else {
+          // Create new achievement
+          const result = await achievementApi.createAchievement(profileId, itemForm);
+          if (result.success) {
+            setAchievements([...achievements, result.data]);
+            toast({
+              title: "Success",
+              description: "Achievement created successfully",
+            });
+          }
+        }
+      } else if (itemType === "project") {
+        if (currentItem) {
+          // Update existing project
+          const result = await projectApi.updateProject(profileId, currentItem.id, itemForm);
+          if (result.success) {
+            setProjects(projects.map(p => p.id === currentItem.id ? result.data : p));
+            toast({
+              title: "Success",
+              description: "Project updated successfully",
+            });
+          }
+        } else {
+          // Create new project
+          const result = await projectApi.createProject(profileId, itemForm);
+          if (result.success) {
+            setProjects([...projects, result.data]);
+            toast({
+              title: "Success",
+              description: "Project created successfully",
+            });
+          }
+        }
+      } else {
+        // Handle other item types
+        if (currentItem) {
+          // Update existing item
+          switch(itemType) {
+            case "client":
+              setClients(clients.map(item => 
+                item.id === currentItem.id ? { ...item, ...itemForm } : item
+              ));
+              break;
+            case "teamMember":
+              setTeamMembers(teamMembers.map(item => 
+                item.id === currentItem.id ? { ...item, ...itemForm } : item
+              ));
+              break;
+            case "insight":
+              setInsights(insights.map(item => 
+                item.id === currentItem.id ? { ...item, ...itemForm } : item
+              ));
+              break;
+          }
+          toast({
+            title: "Item updated",
+            description: `The ${itemType} has been updated successfully.`,
+          });
+        } else {
+          // Create new item
+          const newId = Date.now();
+          switch(itemType) {
+            case "client":
+              setClients([...clients, { ...itemForm, id: newId }]);
+              break;
+            case "teamMember":
+              setTeamMembers([...teamMembers, { ...itemForm, id: newId }]);
+              break;
+            case "insight":
+              setInsights([...insights, { ...itemForm, id: newId }]);
+              break;
+          }
+          toast({
+            title: "Item added",
+            description: `A new ${itemType} has been added successfully.`,
+          });
+        }
+      }
+      setShowItemDialog(false);
+    } catch (error) {
+      console.error('Error saving item:', error);
       toast({
-        title: "Missing information",
-        description: "Please fill in all required fields",
+        title: "Error",
+        description: "Failed to save item",
         variant: "destructive",
       });
-      return;
     }
-
-    if (itemType === "client" && !itemForm.name) {
-      toast({
-        title: "Missing information",
-        description: "Please enter a client name",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Update or create new item based on type
-    if (currentItem) {
-      // Update existing item
-      switch(itemType) {
-        case "achievement":
-          setAchievements(achievements.map(item => 
-            item.id === currentItem.id ? { ...item, ...itemForm } : item
-          ));
-          break;
-        case "project":
-          setProjects(projects.map(item => 
-            item.id === currentItem.id ? { ...item, ...itemForm } : item
-          ));
-          break;
-        case "client":
-          setClients(clients.map(item => 
-            item.id === currentItem.id ? { ...item, ...itemForm } : item
-          ));
-          break;
-        case "teamMember":
-          setTeamMembers(teamMembers.map(item => 
-            item.id === currentItem.id ? { ...item, ...itemForm } : item
-          ));
-          break;
-        case "insight":
-          setInsights(insights.map(item => 
-            item.id === currentItem.id ? { ...item, ...itemForm } : item
-          ));
-          break;
-      }
-
-      toast({
-        title: "Item updated",
-        description: `The ${itemType} has been updated successfully.`,
-      });
-    } else {
-      // Create new item
-      const newId = Date.now();
-      switch(itemType) {
-        case "achievement":
-          setAchievements([...achievements, { ...itemForm, id: newId }]);
-          break;
-        case "project":
-          setProjects([...projects, { ...itemForm, id: newId }]);
-          break;
-        case "client":
-          setClients([...clients, { ...itemForm, id: newId }]);
-          break;
-        case "teamMember":
-          setTeamMembers([...teamMembers, { ...itemForm, id: newId }]);
-          break;
-        case "insight":
-          setInsights([...insights, { ...itemForm, id: newId }]);
-          break;
-      }
-
-      toast({
-        title: "Item added",
-        description: `A new ${itemType} has been added successfully.`,
-      });
-    }
-
-    setShowItemDialog(false);
   };
 
-  const handleOpenDeleteDialog = (type: string, id: number) => {
-    setItemToDelete({ type, id });
-    setShowDeleteDialog(true);
-  };
-
-  const handleDeleteItem = () => {
+  const handleDeleteItem = async () => {
     if (!itemToDelete) return;
 
-    // Delete item based on type
-    switch(itemToDelete.type) {
-      case "achievement":
-        setAchievements(achievements.filter(item => item.id !== itemToDelete.id));
-        break;
-      case "project":
-        setProjects(projects.filter(item => item.id !== itemToDelete.id));
-        break;
-      case "client":
-        setClients(clients.filter(item => item.id !== itemToDelete.id));
-        break;
-      case "teamMember":
-        setTeamMembers(teamMembers.filter(item => item.id !== itemToDelete.id));
-        break;
-      case "insight":
-        setInsights(insights.filter(item => item.id !== itemToDelete.id));
-        break;
-      case "internship":
-        setInternships(internships.filter(item => item.id !== itemToDelete.id));
-        break;
-      case "post":
-        setPosts(posts.filter(item => item.id !== itemToDelete.id));
-        break;
+    try {
+      if (itemToDelete.type === "achievement") {
+        const result = await achievementApi.deleteAchievement(profileId, itemToDelete.id);
+        if (result.success) {
+          setAchievements(achievements.filter(a => a.id !== itemToDelete.id));
+          toast({
+            title: "Success",
+            description: "Achievement deleted successfully",
+          });
+        }
+      } else if (itemToDelete.type === "project") {
+        const result = await projectApi.deleteProject(profileId, itemToDelete.id);
+        if (result.success) {
+          setProjects(projects.filter(p => p.id !== itemToDelete.id));
+          toast({
+            title: "Success",
+            description: "Project deleted successfully",
+          });
+        }
+      } else if (itemToDelete.type === "internship") {
+        const result = await internshipApi.deleteInternship(profileId, itemToDelete.id);
+        if (result.success) {
+          setInternships(internships.filter(i => i.id !== itemToDelete.id));
+          toast({
+            title: "Success",
+            description: "Internship deleted successfully",
+          });
+        }
+      } else {
+        // Delete other item types
+        switch(itemToDelete.type) {
+          case "client":
+            setClients(clients.filter(item => item.id !== itemToDelete.id));
+            break;
+          case "teamMember":
+            setTeamMembers(teamMembers.filter(item => item.id !== itemToDelete.id));
+            break;
+          case "insight":
+            setInsights(insights.filter(item => item.id !== itemToDelete.id));
+            break;
+          case "post":
+            setPosts(posts.filter(item => item.id !== itemToDelete.id));
+            break;
+        }
+        toast({
+          title: "Item deleted",
+          description: `The ${itemToDelete.type} has been deleted.`,
+        });
+      }
+      setShowDeleteDialog(false);
+      setItemToDelete(null);
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete item",
+        variant: "destructive",
+      });
     }
-
-    toast({
-      title: "Item deleted",
-      description: `The ${itemToDelete.type} has been deleted.`,
-    });
-
-    setShowDeleteDialog(false);
-    setItemToDelete(null);
   };
 
   const handleItemInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -1003,6 +1258,11 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
       title: "Success",
       description: "Social media information updated successfully",
     });
+  };
+
+  const handleOpenDeleteDialog = (type: string, id: number) => {
+    setItemToDelete({ type, id });
+    setShowDeleteDialog(true);
   };
 
   return (

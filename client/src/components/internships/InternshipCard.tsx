@@ -28,6 +28,15 @@ const InternshipCard = ({ internship }: InternshipCardProps) => {
     return count === 1 ? "1 applicant" : `${count} applicants`;
   };
 
+  // Helper to safely format createdAt
+  let postedString = "N/A";
+  if (internship.createdAt) {
+    const createdDate = new Date(internship.createdAt);
+    if (!isNaN(createdDate.getTime())) {
+      postedString = formatDistanceToNow(createdDate, { addSuffix: true });
+    }
+  }
+
   return (
     <div className="border border-neutral-200 rounded-lg p-4 mb-4 hover:shadow-md transition-shadow">
       <div className="flex items-start">
@@ -63,8 +72,7 @@ const InternshipCard = ({ internship }: InternshipCardProps) => {
           </p>
           <div className="mt-3 flex justify-between items-center">
             <span className="text-xs text-neutral-500">
-              Posted {formatDistanceToNow(new Date(internship.createdAt), { addSuffix: true })} • 
-              {formatApplicantsCount(Math.floor(Math.random() * 100))}
+              Posted {postedString} • {formatApplicantsCount(Math.floor(Math.random() * 100))}
             </span>
             <Link href={`/internships/${internship.id}`}>
               <Button size="sm">

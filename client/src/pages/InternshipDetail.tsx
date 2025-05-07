@@ -35,15 +35,17 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Internship } from "@shared/schema";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/contexts/AuthContext";
+import { internshipApi, applicationApi, type Internship, type Application } from "@/services/api";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const InternshipDetail = () => {
   const [, params] = useRoute("/internships/:id");
-  const internshipId = params?.id ? parseInt(params.id) : 0;
+  const internshipId = params?.id ? params.id : "";
   const [internship, setInternship] = useState<Internship | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [showApplyDialog, setShowApplyDialog] = useState(false);
   const [applicationStep, setApplicationStep] = useState(1);
@@ -57,125 +59,48 @@ const InternshipDetail = () => {
   });
   const { toast } = useToast();
 
-  // Mock internship data fetch
   useEffect(() => {
-    const mockInternships: Internship[] = [
-      {
-        id: 1,
-        title: "UX/UI Design Intern",
-        company: "DesignHub",
-        location: "Paris, France",
-        description: "Join our creative team to design intuitive user interfaces for web and mobile applications. You'll work with experienced designers and developers to create elegant solutions to complex UX challenges.",
-        requirements: "Proficiency in Figma, Adobe XD, and basic knowledge of HTML/CSS. Studying design or a related field.",
-        duration: "6 months",
-        isPaid: true,
-        workType: "Hybrid",
-        compensation: "€800/month",
-        applicationDeadline: new Date("2023-06-15"),
-        postedBy: 1,
-        createdAt: new Date("2023-05-01"),
-      },
-      {
-        id: 2,
-        title: "Software Engineering Intern",
-        company: "TechCorp",
-        location: "Lyon, France",
-        description: "Looking for a passionate software engineering intern to join our development team. You'll be working on real projects using technologies like React, Node.js, and AWS. Great opportunity to apply your technical skills in a real-world setting.",
-        requirements: "Knowledge of JavaScript, React, and Node.js. Currently pursuing a degree in Computer Science or related field.",
-        duration: "3 months",
-        isPaid: true,
-        workType: "On-site",
-        compensation: "€900/month",
-        applicationDeadline: new Date("2023-06-30"),
-        postedBy: 2,
-        createdAt: new Date("2023-04-28"),
-      },
-      {
-        id: 3,
-        title: "Marketing Analytics Intern",
-        company: "GlobalBrands",
-        location: "Paris, France",
-        description: "GlobalBrands is seeking a Marketing Analytics Intern to help analyze campaign performance and provide data-driven insights. You'll work with marketing teams to optimize strategies and measure ROI across different channels.",
-        requirements: "Strong analytical skills, knowledge of Excel and Google Analytics. Studying Marketing, Business, or Statistics.",
-        duration: "6 months",
-        isPaid: true,
-        workType: "Remote",
-        compensation: "€850/month",
-        applicationDeadline: new Date("2023-06-10"),
-        postedBy: 3,
-        createdAt: new Date("2023-04-30"),
-      },
-      {
-        id: 4,
-        title: "Research & Development Intern",
-        company: "BioInnovate",
-        location: "Marseille, France",
-        description: "BioInnovate is looking for a research intern to assist in our biotech R&D department. The ideal candidate will have a background in biology or chemistry and a strong interest in laboratory research and innovation.",
-        requirements: "Background in Biology, Chemistry or related field. Laboratory experience is a plus.",
-        duration: "6+ months",
-        isPaid: true,
-        workType: "On-site",
-        compensation: "€950/month",
-        applicationDeadline: new Date("2023-07-15"),
-        postedBy: 4,
-        createdAt: new Date("2023-04-25"),
-      },
-      {
-        id: 5,
-        title: "Junior UX Designer",
-        company: "Creative Studio",
-        location: "Paris, France",
-        description: "Creative Studio is seeking a Junior UX Designer to join our team. You'll work closely with senior designers on various client projects, focusing on creating intuitive and engaging user experiences.",
-        requirements: "Basic knowledge of UX design principles and tools like Figma or Sketch. A portfolio of design projects is a plus. Pursuing a degree in Design or related field.",
-        duration: "6 months",
-        isPaid: true,
-        workType: "Hybrid",
-        compensation: "€850/month",
-        applicationDeadline: new Date("2023-07-20"),
-        postedBy: 5,
-        createdAt: new Date("2023-05-10"),
-      },
-      {
-        id: 6,
-        title: "Product Design Intern",
-        company: "TechStart",
-        location: "Remote",
-        description: "TechStart is looking for a talented Product Design Intern to help us create innovative digital products. You'll be involved in all aspects of the design process from research to implementation.",
-        requirements: "Understanding of UI/UX principles. Familiarity with design software like Figma, Sketch, or Adobe XD. Currently enrolled in a Design, HCI, or related program.",
-        duration: "3 months",
-        isPaid: true,
-        workType: "Remote",
-        compensation: "€800/month",
-        applicationDeadline: new Date("2023-06-25"),
-        postedBy: 6,
-        createdAt: new Date("2023-05-05"),
-      },
-      {
-        id: 7,
-        title: "UI/UX Design Assistant",
-        company: "DigitalEdge",
-        location: "Lyon, France",
-        description: "DigitalEdge is seeking a UI/UX Design Assistant to support our design team on client projects. You'll help create wireframes, mockups, and prototypes for web and mobile applications.",
-        requirements: "Understanding of UI/UX design principles. Proficiency with design tools like Figma or Adobe XD. Creative portfolio demonstrating UI design skills.",
-        duration: "4 months",
-        isPaid: true,
-        workType: "On-site",
-        compensation: "€875/month",
-        applicationDeadline: new Date("2023-07-05"),
-        postedBy: 7,
-        createdAt: new Date("2023-05-15"),
-      },
-    ];
+    const fetchInternshipDetails = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        console.log(`Attempting to fetch internship with ID: ${internshipId}`);
+        // Fetch the internship by ID only (no companyId required)
+        let data: Internship | null = null;
+        try {
+          data = await internshipApi.getInternshipById(internshipId);
+          console.log("Successfully fetched internship:", data);
+        } catch (err: any) {
+          console.error("Error fetching internship:", err);
+          throw err;
+        }
+        setInternship(data);
 
-    // Simulate API call
-    setTimeout(() => {
-      const foundInternship = mockInternships.find(i => i.id === internshipId);
-      if (foundInternship) {
-        setInternship(foundInternship);
-        document.title = `${foundInternship.title} at ${foundInternship.company} | StageConnect`;
+        // Set a safe document title - handle missing company
+        const companyName = data.company?.name || "Unknown Company";
+        document.title = `${data.title} at ${companyName} | StageConnect`;
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to fetch internship details";
+        console.error("Setting error state:", errorMessage);
+        setError(errorMessage);
+        toast({
+          title: "Error",
+          description: "Failed to fetch internship details. Please try again later.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
       }
+    };
+
+    if (internshipId) {
+      console.log("Internship ID is present, fetching details");
+      fetchInternshipDetails();
+    } else {
+      console.warn("No internship ID provided");
+      setError("No internship ID provided");
       setLoading(false);
-    }, 500);
+    }
   }, [internshipId]);
 
   const handleSave = () => {
@@ -189,7 +114,6 @@ const InternshipDetail = () => {
   };
 
   const handleShare = () => {
-    // In production, would use actual share API
     navigator.clipboard.writeText(window.location.href);
     toast({
       title: "Link copied",
@@ -200,7 +124,6 @@ const InternshipDetail = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
-    // Check if this is a nested property (questionsAnswers)
     if (name.includes('.')) {
       const [parent, child] = name.split('.');
       setApplicationForm({
@@ -218,48 +141,115 @@ const InternshipDetail = () => {
     }
   };
 
-  const nextStep = () => {
-    setApplicationStep(prev => prev + 1);
+  const submitApplication = async () => {
+    try {
+      if (!user || !internship) {
+        toast({
+          title: "Error",
+          description: "Missing user or internship information",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Format data according to backend expectations
+      const applicationData = {
+        user_id: user.id,
+        questionAnswers: applicationForm.questionsAnswers,
+        availableStartDate: applicationForm.questionsAnswers.availableDate
+      };
+
+      // Submit application
+      const response = await applicationApi.submitApplication(internshipId.toString(), applicationData);
+      
+      // Handle response
+      if (response && response.success) {
+        setShowApplyDialog(false);
+        setApplicationStep(1);
+        // Reset form data
+        setApplicationForm({
+          questionsAnswers: {
+            whyInterested: "",
+            relevantExperience: "",
+            availableDate: ""
+          }
+        });
+        
+        toast({
+          title: "Success",
+          description: response.message || "Your application has been successfully submitted.",
+        });
+      } else {
+        // This should not typically happen due to error handling in the API service
+        toast({
+          title: "Error",
+          description: response.message || "Failed to submit application. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      console.error("Application submission error:", err);
+      
+      // Handle specific error cases
+      let errorMessage = "Failed to submit application. Please try again later.";
+      
+      if (err.message) {
+        if (err.message.includes("already applied")) {
+          errorMessage = "You have already applied to this internship.";
+        } else if (err.message.includes("not found")) {
+          errorMessage = "User or internship information is invalid.";
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
   };
 
-  const prevStep = () => {
-    setApplicationStep(prev => prev - 1);
-  };
-
-  const submitApplication = () => {
-    // Here would be the API call to submit the application
-    console.log("Application submitted:", {
-      user: user,
-      internship: internship,
-      answers: applicationForm.questionsAnswers
-    });
-    setShowApplyDialog(false);
-    setApplicationStep(1);
-    toast({
-      title: "Application submitted",
-      description: "Your application has been successfully submitted.",
-    });
-  };
+  // Safely format posted and deadline dates
+  let postedString = "N/A";
+  let deadlineString = "N/A";
+  if (internship) {
+    if (internship.posted) {
+      const postedDate = new Date(internship.posted);
+      if (!isNaN(postedDate.getTime())) {
+        postedString = formatDistanceToNow(postedDate, { addSuffix: true });
+      }
+    }
+    if (internship.deadline) {
+      const deadlineDate = new Date(internship.deadline);
+      if (!isNaN(deadlineDate.getTime())) {
+        deadlineString = format(deadlineDate, "MMMM d, yyyy");
+      }
+    }
+  }
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-10 flex justify-center">
-        <div className="animate-pulse space-y-6 w-full max-w-3xl">
-          <div className="h-8 bg-neutral-200 rounded w-2/3"></div>
-          <div className="h-4 bg-neutral-200 rounded w-1/2"></div>
-          <div className="h-64 bg-neutral-200 rounded"></div>
+      <div className="container mx-auto px-4 py-10">
+        <div className="max-w-3xl mx-auto space-y-6">
+          <Skeleton className="h-8 w-2/3" />
+          <Skeleton className="h-4 w-1/2" />
+          <Skeleton className="h-64 w-full" />
         </div>
       </div>
     );
   }
 
-  if (!internship) {
+  if (error || !internship) {
     return (
       <div className="container mx-auto px-4 py-10">
         <Card className="max-w-3xl mx-auto">
           <CardContent className="py-10 text-center">
             <h2 className="text-xl font-semibold mb-2">Internship Not Found</h2>
-            <p className="text-neutral-600 mb-6">The internship you're looking for doesn't exist or has been removed.</p>
+            <p className="text-neutral-600 mb-6">
+              {error || "The internship you're looking for doesn't exist or has been removed."}
+            </p>
             <Link href="/internships">
               <Button>
                 <ArrowLeftIcon className="h-4 w-4 mr-2" />
@@ -292,7 +282,7 @@ const InternshipDetail = () => {
                   <CardTitle className="text-2xl font-bold">{internship.title}</CardTitle>
                   <CardDescription className="flex items-center mt-1 text-neutral-600">
                     <BuildingIcon className="h-4 w-4 mr-1" />
-                    {internship.company}
+                    {internship.company?.name || "Unknown Company"}
                   </CardDescription>
                 </div>
                 <div className="flex space-x-2">
@@ -347,9 +337,9 @@ const InternshipDetail = () => {
                     <BuildingIcon className="h-6 w-6 text-neutral-500" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">{internship.company}</h4>
+                    <h4 className="font-semibold">{internship.company?.name || "Unknown Company"}</h4>
                     <p className="text-sm text-neutral-600">
-                      {internship.company} is a leading company in its industry, committed to innovation and excellence. They provide a supportive environment for interns to learn and grow.
+                      {internship.company?.name || "This company"} is a leading company in its industry, committed to innovation and excellence. They provide a supportive environment for interns to learn and grow.
                     </p>
                     <Button variant="link" className="px-0 text-primary-600 h-auto">
                       View company profile
@@ -360,8 +350,8 @@ const InternshipDetail = () => {
             </CardContent>
             <CardFooter>
               <p className="text-sm text-neutral-500">
-                Posted {formatDistanceToNow(new Date(internship.createdAt), { addSuffix: true })} • 
-                Application deadline: {format(new Date(internship.applicationDeadline), "MMMM d, yyyy")}
+                Posted {postedString} • 
+                Application deadline: {deadlineString}
               </p>
             </CardFooter>
           </Card>
@@ -429,11 +419,11 @@ const InternshipDetail = () => {
             <CardContent>
               <p className="text-sm text-neutral-600 mb-4">
                 Don't miss this opportunity to kick-start your career. 
-                Application deadline is {format(new Date(internship.applicationDeadline), "MMMM d, yyyy")}.
+                Application deadline is {deadlineString}.
               </p>
               <div className="flex items-center space-x-2 text-sm text-neutral-600 mb-4">
                 <UsersIcon className="h-4 w-4" />
-                <span>{Math.floor(Math.random() * 100)} people have applied</span>
+                <span>{internship.applicants} people have applied</span>
               </div>
               <Dialog open={showApplyDialog} onOpenChange={setShowApplyDialog}>
                 <DialogTrigger asChild>
@@ -443,7 +433,7 @@ const InternshipDetail = () => {
                   <DialogHeader>
                     <DialogTitle>Apply to {internship.title}</DialogTitle>
                     <DialogDescription>
-                      Complete the following steps to submit your application to {internship.company}.
+                      Complete the following steps to submit your application to {internship.company?.name || "Unknown Company"}.
                     </DialogDescription>
                   </DialogHeader>
                   
@@ -525,41 +515,10 @@ const InternshipDetail = () => {
               <CardTitle className="text-lg font-semibold">Similar Internships</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Link href="/internships/5" className="block">
-                <div className="border-b border-neutral-200 pb-3 hover:bg-neutral-50 p-2 rounded-md transition-colors">
-                  <h4 className="font-medium">Junior UX Designer</h4>
-                  <p className="text-sm text-neutral-600">Creative Studio • Paris</p>
-                  <div className="flex items-center mt-1">
-                    <Badge variant="outline" className="mr-2 text-xs">6 months</Badge>
-                    <Badge variant="outline" className="text-xs">Paid</Badge>
-                  </div>
-                </div>
-              </Link>
-              <Link href="/internships/6" className="block">
-                <div className="border-b border-neutral-200 pb-3 hover:bg-neutral-50 p-2 rounded-md transition-colors">
-                  <h4 className="font-medium">Product Design Intern</h4>
-                  <p className="text-sm text-neutral-600">TechStart • Remote</p>
-                  <div className="flex items-center mt-1">
-                    <Badge variant="outline" className="mr-2 text-xs">3 months</Badge>
-                    <Badge variant="outline" className="text-xs">Paid</Badge>
-                  </div>
-                </div>
-              </Link>
-              <Link href="/internships/7" className="block">
-                <div className="hover:bg-neutral-50 p-2 rounded-md transition-colors">
-                  <h4 className="font-medium">UI/UX Design Assistant</h4>
-                  <p className="text-sm text-neutral-600">DigitalEdge • Lyon</p>
-                  <div className="flex items-center mt-1">
-                    <Badge variant="outline" className="mr-2 text-xs">4 months</Badge>
-                    <Badge variant="outline" className="text-xs">Paid</Badge>
-                  </div>
-                </div>
-              </Link>
-              <Link href="/internships">
-                <Button variant="outline" className="w-full">
-                  View More
-                </Button>
-              </Link>
+              {/* Similar internships would be fetched from the API */}
+              <div className="text-center text-neutral-500">
+                Loading similar internships...
+              </div>
             </CardContent>
           </Card>
         </div>

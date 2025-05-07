@@ -5,7 +5,10 @@ import InternshipCard from "@/components/internships/InternshipCard";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Internship } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
+import { internshipApi, type Internship, type PaginatedResponse } from "@/services/api";
+import { Skeleton } from "@/components/ui/skeleton";
+import { API_BASE_URL } from "@/config";
 
 const Internships = () => {
   const [searchParams, setSearchParams] = useState({ keyword: "", location: "" });
@@ -16,89 +19,138 @@ const Internships = () => {
     compensation: [],
   });
   const [sortBy, setSortBy] = useState("relevance");
-  const [internships, setInternships] = useState<Internship[]>([
-    {
-      id: 1,
-      title: "UX/UI Design Intern",
-      company: "DesignHub",
-      location: "Paris, France",
-      description: "Join our creative team to design intuitive user interfaces for web and mobile applications. You'll work with experienced designers and developers to create elegant solutions to complex UX challenges.",
-      requirements: "Proficiency in Figma, Adobe XD, and basic knowledge of HTML/CSS. Studying design or a related field.",
-      duration: "6 months",
-      isPaid: true,
-      workType: "Hybrid",
-      compensation: "€800/month",
-      applicationDeadline: new Date("2023-06-15"),
-      postedBy: 1,
-      createdAt: new Date("2023-05-01"),
-    },
-    {
-      id: 2,
-      title: "Software Engineering Intern",
-      company: "TechCorp",
-      location: "Lyon, France",
-      description: "Looking for a passionate software engineering intern to join our development team. You'll be working on real projects using technologies like React, Node.js, and AWS. Great opportunity to apply your technical skills in a real-world setting.",
-      requirements: "Knowledge of JavaScript, React, and Node.js. Currently pursuing a degree in Computer Science or related field.",
-      duration: "3 months",
-      isPaid: true,
-      workType: "On-site",
-      compensation: "€900/month",
-      applicationDeadline: new Date("2023-06-30"),
-      postedBy: 2,
-      createdAt: new Date("2023-04-28"),
-    },
-    {
-      id: 3,
-      title: "Marketing Analytics Intern",
-      company: "GlobalBrands",
-      location: "Paris, France",
-      description: "GlobalBrands is seeking a Marketing Analytics Intern to help analyze campaign performance and provide data-driven insights. You'll work with marketing teams to optimize strategies and measure ROI across different channels.",
-      requirements: "Strong analytical skills, knowledge of Excel and Google Analytics. Studying Marketing, Business, or Statistics.",
-      duration: "6 months",
-      isPaid: true,
-      workType: "Remote",
-      compensation: "€850/month",
-      applicationDeadline: new Date("2023-06-10"),
-      postedBy: 3,
-      createdAt: new Date("2023-04-30"),
-    },
-    {
-      id: 4,
-      title: "Research & Development Intern",
-      company: "BioInnovate",
-      location: "Marseille, France",
-      description: "BioInnovate is looking for a research intern to assist in our biotech R&D department. The ideal candidate will have a background in biology or chemistry and a strong interest in laboratory research and innovation.",
-      requirements: "Background in Biology, Chemistry or related field. Laboratory experience is a plus.",
-      duration: "6+ months",
-      isPaid: true,
-      workType: "On-site",
-      compensation: "€950/month",
-      applicationDeadline: new Date("2023-07-15"),
-      postedBy: 4,
-      createdAt: new Date("2023-04-25"),
-    },
-  ]);
+  const [internships, setInternships] = useState<Internship[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const { toast } = useToast();
 
   useEffect(() => {
     document.title = "Find Internships | StageConnect";
   }, []);
 
+  const fetchInternships = async (page = 0) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Get company ID from context or URL params
+      const companyId = "1"; // Replace with actual company ID
+      
+      // Use the new active internships endpoint
+      const response = await fetch(`${API_BASE_URL}/api/companies/${companyId}/internships/active`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch internships: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setInternships(result.data || []);
+        // Since the new endpoint doesn't support pagination yet, we'll set these to default values
+        setTotalPages(1);
+        setCurrentPage(0);
+      } else {
+        throw new Error(result.message || 'Failed to fetch internships');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch internships");
+      setInternships([]);
+      setTotalPages(0);
+      setCurrentPage(0);
+      toast({
+        title: "Error",
+        description: "Failed to fetch internships. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInternships(currentPage);
+  }, [currentPage, filters]);
+
   const handleSearch = (params: { keyword: string; location: string }) => {
     setSearchParams(params);
-    // In a real app, this would make an API call to get filtered results
-    console.log("Search params:", params);
+    // Reset to first page when searching
+    setCurrentPage(0);
+    fetchInternships(0);
   };
 
   const handleFilterChange = (newFilters: Record<string, string[]>) => {
     setFilters(newFilters);
-    // In a real app, this would make an API call to get filtered results
-    console.log("Filters:", newFilters);
+    // Reset to first page when filters change
+    setCurrentPage(0);
   };
 
   const handleSortChange = (value: string) => {
     setSortBy(value);
-    // In a real app, this would sort the results accordingly
-    console.log("Sort by:", value);
+    // Implement sorting logic here
+    const sortedInternships = [...internships].sort((a, b) => {
+      switch (value) {
+        case "newest":
+          return new Date(b.posted).getTime() - new Date(a.posted).getTime();
+        case "oldest":
+          return new Date(a.posted).getTime() - new Date(b.posted).getTime();
+        default:
+          return 0;
+      }
+    });
+    setInternships(sortedInternships);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const renderPagination = () => {
+    // Since we're not using pagination from the API yet, we'll hide the pagination
+    return null;
+  };
+
+  const renderInternshipList = () => {
+    if (loading) {
+      return Array(3).fill(0).map((_, index) => (
+        <div key={index} className="mb-4">
+          <Skeleton className="h-32 w-full" />
+        </div>
+      ));
+    }
+
+    if (error) {
+      return (
+        <div className="text-center py-8">
+          <p className="text-red-500">{error}</p>
+          <button
+            onClick={() => fetchInternships(currentPage)}
+            className="mt-4 px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+
+    if (!internships || internships.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <p className="text-neutral-500">No active internships found matching your criteria.</p>
+        </div>
+      );
+    }
+
+    return internships.map((internship) => (
+      <InternshipCard key={internship.id} internship={internship} />
+    ));
   };
 
   return (
@@ -114,7 +166,15 @@ const Internships = () => {
           <Card>
             <CardHeader className="py-4">
               <div className="flex justify-between items-center">
-                <CardTitle className="text-lg font-semibold">{internships.length} Internships found</CardTitle>
+                <CardTitle className="text-lg font-semibold">
+                  {loading ? (
+                    <Skeleton className="h-6 w-48" />
+                  ) : error ? (
+                    "Error loading internships"
+                  ) : (
+                    `${internships?.length || 0} Active Internships found`
+                  )}
+                </CardTitle>
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-neutral-500">Sort by:</span>
                   <Select value={sortBy} onValueChange={handleSortChange}>
@@ -131,38 +191,13 @@ const Internships = () => {
               </div>
             </CardHeader>
             <CardContent>
-              {internships.map((internship) => (
-                <InternshipCard key={internship.id} internship={internship} />
-              ))}
+              {renderInternshipList()}
               
-              <Pagination className="mt-6">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious href="#" />
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationLink href="#" isActive>1</PaginationLink>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationLink href="#">2</PaginationLink>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationLink href="#">3</PaginationLink>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationLink href="#">4</PaginationLink>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationLink href="#">5</PaginationLink>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationEllipsis />
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationNext href="#" />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
+              {!loading && !error && internships?.length > 0 && (
+                <Pagination className="mt-6">
+                  {renderPagination()}
+                </Pagination>
+              )}
             </CardContent>
           </Card>
         </div>
