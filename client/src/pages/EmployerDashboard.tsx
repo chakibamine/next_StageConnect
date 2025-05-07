@@ -519,7 +519,7 @@ export default function EmployerDashboard() {
       console.log("API response:", result);
       
       // Update local state after successful API call
-      setApplications(applications.map(app => 
+    setApplications(applications.map(app => 
         app.id === applicationId ? {
           ...app, 
           status: newStatus as any,
@@ -549,13 +549,13 @@ export default function EmployerDashboard() {
 
   // Set applicant being viewed and initialize form data
   const viewApplicantDetails = (applicant: Application) => {
-    setCurrentApplicant(applicant);
+      setCurrentApplicant(applicant);
     // Use optional chaining to safely access feedback which may not be properly typed
     setApplicantNotes(applicant?.feedback || "");
     // Initialize interview date/time if they exist, or set defaults
     setInterviewDate(applicant.interviewDate || new Date().toISOString().split('T')[0]);
     setInterviewTime(applicant.interviewTime || "09:00");
-    setShowApplicantView(true);
+      setShowApplicantView(true);
   };
 
   // Function to view the full applicant profile in a new tab
@@ -1077,7 +1077,7 @@ export default function EmployerDashboard() {
                     >
                       Retry
                     </Button>
-                  </div>
+                      </div>
                 ) : internships.length === 0 ? (
                   <div className="text-center py-12">
                     <BriefcaseIcon className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
@@ -1094,7 +1094,7 @@ export default function EmployerDashboard() {
                       <Plus className="h-4 w-4" />
                       Create New Listing
                     </Button>
-                  </div>
+                        </div>
                 ) : (
                   internships.map((internship: any) => {
                     const internshipApps = getApplicationsForInternship(internship.id);
@@ -1118,13 +1118,13 @@ export default function EmployerDashboard() {
                                   <span>Deadline: {new Date(internship.deadline).toLocaleDateString()}</span>
                                 </>
                               )}
-                            </div>
-                          </div>
+                        </div>
+                        </div>
                           <div className="flex items-center gap-3">
                             <div className="text-center">
                               <div className="font-semibold">{internshipApps.length}</div>
                               <div className="text-xs text-muted-foreground">Applicants</div>
-                            </div>
+                      </div>
                             <Badge className={
                               internship.status === "active" ? "bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white" :
                               internship.status === "draft" ? "bg-muted text-muted-foreground" :
@@ -1140,7 +1140,7 @@ export default function EmployerDashboard() {
                               <Button variant="ghost" size="icon" onClick={(e) => {e.stopPropagation(); handleEditInternship(internship)}} className="h-8 w-8 text-neutral-600 hover:text-[#0A77FF] hover:bg-[#0A77FF]/5">
                                 <PencilIcon className="h-4 w-4" />
                               </Button>
-                              <Button 
+                      <Button 
                                 variant="ghost" 
                                 size="icon" 
                                 onClick={(e) => {e.stopPropagation(); toggleInternshipStatus(internship)}}
@@ -1151,15 +1151,15 @@ export default function EmployerDashboard() {
                                 ) : (
                                   <CheckIcon className="h-4 w-4" />
                                 )}
-                              </Button>
-                              <Button 
+                      </Button>
+                      <Button 
                                 variant="ghost" 
                                 size="icon" 
                                 onClick={(e) => {e.stopPropagation(); confirmDelete(internship)}}
                                 className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
                               >
                                 <TrashIcon className="h-4 w-4" />
-                              </Button>
+                      </Button>
                             </div>
                           </div>
                         </div>
@@ -1566,32 +1566,32 @@ export default function EmployerDashboard() {
                         const apps = getApplicationsForInternship(internship.id);
                         return apps.length > 0;
                       })
-                      .map(internship => {
+                    .map(internship => {
                         const internshipApps = getApplicationsForInternship(internship.id);
-                        return (
-                          <div key={internship.id} className="border rounded-lg p-4 hover:border-[#0A77FF]/50 hover:shadow-sm transition-all">
-                            <h3 className="font-medium text-sm">{internship.title}</h3>
-                            <div className="mt-2 flex items-center">
-                              <UsersIcon className="h-4 w-4 text-[#0A77FF] mr-2" />
-                              <span className="text-2xl font-bold">{internshipApps.length}</span>
-                            </div>
-                            <div className="mt-2 pt-2 border-t border-neutral-100">
-                              <div className="grid grid-cols-2 gap-1 text-xs">
-                                <div className="flex gap-1 items-center">
-                                  <div className="w-2 h-2 rounded-full bg-amber-400"></div>
-                                  <span>{internshipApps.filter(a => a.status === "pending").length} Pending</span>
-                                </div>
-                                <div className="flex gap-1 items-center">
-                                  <div className="w-2 h-2 rounded-full bg-[#0A77FF]"></div>
-                                  <span>{internshipApps.filter(a => a.status === "interview").length} Interview</span>
-                                </div>
+                      return (
+                        <div key={internship.id} className="border rounded-lg p-4 hover:border-[#0A77FF]/50 hover:shadow-sm transition-all">
+                          <h3 className="font-medium text-sm">{internship.title}</h3>
+                          <div className="mt-2 flex items-center">
+                            <UsersIcon className="h-4 w-4 text-[#0A77FF] mr-2" />
+                            <span className="text-2xl font-bold">{internshipApps.length}</span>
+                          </div>
+                          <div className="mt-2 pt-2 border-t border-neutral-100">
+                            <div className="grid grid-cols-2 gap-1 text-xs">
+                              <div className="flex gap-1 items-center">
+                                <div className="w-2 h-2 rounded-full bg-amber-400"></div>
+                                <span>{internshipApps.filter(a => a.status === "pending").length} Pending</span>
+                              </div>
+                              <div className="flex gap-1 items-center">
+                                <div className="w-2 h-2 rounded-full bg-[#0A77FF]"></div>
+                                <span>{internshipApps.filter(a => a.status === "interview").length} Interview</span>
                               </div>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              {internship.status === "active" ? "Active" : "Closed"} • {internship.location}
-                            </p>
                           </div>
-                        );
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {internship.status === "active" ? "Active" : "Closed"} • {internship.location}
+                          </p>
+                        </div>
+                      );
                       })
                   )}
                     
@@ -1866,8 +1866,8 @@ export default function EmployerDashboard() {
                                 Applied {formatRelativeTime(currentApplicant.appliedAt)}
                               </span>
                               <span className="text-muted-foreground">•</span>
-                              <Badge 
-                                className={
+                          <Badge 
+                            className={
                                   currentApplicant.status === "pending" ? "bg-amber-100 text-amber-700" :
                                   currentApplicant.status === "interview" ? "bg-primary/10 text-primary" :
                                   currentApplicant.status === "accepted" ? "bg-green-100 text-green-700" :
@@ -1875,8 +1875,8 @@ export default function EmployerDashboard() {
                                 }
                               >
                                 {currentApplicant.status}
-                              </Badge>
-                            </div>
+                          </Badge>
+                        </div>
                           </div>
                         </div>
                         
@@ -1885,16 +1885,16 @@ export default function EmployerDashboard() {
                           <div className="bg-muted/30 p-3 rounded-md max-h-40 overflow-y-auto text-sm">
                             {currentApplicant.coverLetter || "No cover letter provided"}
                           </div>
-                        </div>
+                          </div>
                         
                         {currentApplicant.applicant?.about && (
                           <div className="border rounded-lg p-4">
                             <h3 className="font-medium mb-2">About</h3>
                             <div className="bg-muted/30 p-3 rounded-md max-h-40 overflow-y-auto text-sm">
                               {currentApplicant.applicant.about}
-                            </div>
                           </div>
-                        )}
+                            </div>
+                          )}
                         
                         <div className="border rounded-lg p-4">
                           <h3 className="font-medium mb-3">Application Status</h3>
@@ -1929,49 +1929,49 @@ export default function EmployerDashboard() {
                                 >
                                   Reject
                                 </Button>
-                              </div>
-                            </div>
-                            
+                        </div>
+                      </div>
+
                             {currentApplicant.status === "interview" && (
                               <div className="border-t pt-3 mt-3">
                                 <h4 className="text-sm font-medium mb-2">Schedule Interview</h4>
                                 <div className="grid grid-cols-2 gap-3">
-                                  <div className="space-y-2">
-                                    <Label htmlFor="interviewDate">Date</Label>
-                                    <Input
-                                      id="interviewDate"
-                                      type="date"
-                                      value={interviewDate}
-                                      onChange={(e) => setInterviewDate(e.target.value)}
-                                    />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label htmlFor="interviewTime">Time</Label>
-                                    <Input
-                                      id="interviewTime"
-                                      type="time"
-                                      value={interviewTime}
-                                      onChange={(e) => setInterviewTime(e.target.value)}
-                                    />
-                                  </div>
-                                </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="interviewDate">Date</Label>
+                            <Input 
+                              id="interviewDate"
+                              type="date"
+                              value={interviewDate}
+                              onChange={(e) => setInterviewDate(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="interviewTime">Time</Label>
+                            <Input 
+                              id="interviewTime"
+                              type="time"
+                              value={interviewTime}
+                              onChange={(e) => setInterviewTime(e.target.value)}
+                            />
+                          </div>
+                        </div>
                               </div>
                             )}
-                            
+
                             <div className="border-t pt-3 mt-3">
                               <h4 className="text-sm font-medium mb-2">Feedback Notes</h4>
-                              <Textarea
+                          <Textarea 
                                 placeholder="Add private notes about this applicant..."
-                                value={applicantNotes}
-                                onChange={(e) => setApplicantNotes(e.target.value)}
+                            value={applicantNotes}
+                            onChange={(e) => setApplicantNotes(e.target.value)}
                                 className="min-h-[100px]"
-                              />
-                            </div>
+                          />
+                        </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                    
+
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setShowApplicantView(false)}>Cancel</Button>
                       <Button 

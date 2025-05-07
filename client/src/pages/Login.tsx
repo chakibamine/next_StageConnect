@@ -62,9 +62,21 @@ const Login = () => {
       
       navigate("/");
     } catch (error) {
+      console.error("Login form error:", error);
+      
+      let errorMessage = "Please check your credentials and try again";
+      
+      if (error instanceof Error) {
+        if (error.message.includes("Malformed JSON")) {
+          errorMessage = "The server returned an invalid response. Please try again later or contact support.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
         title: "Authentication failed",
-        description: error instanceof Error ? error.message : "Please check your credentials and try again",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

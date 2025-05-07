@@ -185,6 +185,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         false
       );
       
+      // Validate required fields from response
+      if (!data.id || !data.firstName || !data.lastName || !data.email || !data.userType) {
+        console.error("Login response missing required fields:", data);
+        throw new Error("Incomplete response from server");
+      }
+      
       // Map backend userType to frontend role
       let userRole: "admin" | "student" | "supervisor" | "employer" = "student";
       

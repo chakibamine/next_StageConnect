@@ -414,4 +414,534 @@ export const applicationApi = {
       throw error;
     }
   },
+};
+
+// Post API service
+export interface Post {
+  id: number;
+  content: string;
+  authorId: number;
+  imageUrl?: string;
+  likeCount: number;
+  commentCount: number;
+  createdAt: string;
+  updatedAt: string;
+  author?: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    photo?: string;
+    title?: string;
+  };
+  hasLiked?: boolean;
+  comments?: Comment[];
+}
+
+export interface Comment {
+  id: number;
+  content: string;
+  authorId: number;
+  postId: number;
+  createdAt: string;
+  author?: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    photo?: string;
+  };
+  replies?: Comment[];
+}
+
+export const postApi = {
+  // Get user feed
+  getFeed: async (userId: string, page = 0, size = 10): Promise<PaginatedResponse<Post>> => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/posts/feed?user_id=${userId}&page=${page}&size=${size}`,
+        {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch feed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        content: data.posts || [],
+        currentPage: data.currentPage,
+        totalItems: data.totalItems,
+        totalPages: data.totalPages
+      };
+    } catch (error) {
+      console.error('Error fetching feed:', error);
+      throw error;
+    }
+  },
+
+  // Get all posts
+  getAllPosts: async (userId?: string, page = 0, size = 10): Promise<PaginatedResponse<Post>> => {
+    try {
+      const url = new URL(`${API_BASE_URL}/api/posts`);
+      url.searchParams.append('page', page.toString());
+      url.searchParams.append('size', size.toString());
+      if (userId) url.searchParams.append('userId', userId);
+
+      const response = await fetch(url.toString(), {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch posts: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        content: data.posts || [],
+        currentPage: data.currentPage,
+        totalItems: data.totalItems,
+        totalPages: data.totalPages
+      };
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      throw error;
+    }
+  },
+
+  // Get posts by a specific user
+  getUserPosts: async (userId: string, currentUserId?: string, page = 0, size = 10): Promise<PaginatedResponse<Post>> => {
+    try {
+      const url = new URL(`${API_BASE_URL}/api/posts/user/${userId}`);
+      url.searchParams.append('page', page.toString());
+      url.searchParams.append('size', size.toString());
+      if (currentUserId) url.searchParams.append('currentUserId', currentUserId);
+
+      const response = await fetch(url.toString(), {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch user posts: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        content: data.posts || [],
+        currentPage: data.currentPage,
+        totalItems: data.totalItems,
+        totalPages: data.totalPages
+      };
+    } catch (error) {
+      console.error('Error fetching user posts:', error);
+      throw error;
+    }
+  },
+
+  // Get a specific post
+  getPost: async (postId: string, userId?: string): Promise<Post> => {
+    try {
+      const url = new URL(`${API_BASE_URL}/api/posts/${postId}`);
+      if (userId) url.searchParams.append('userId', userId);
+
+      const response = await fetch(url.toString(), {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch post: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching post:', error);
+      throw error;
+    }
+  },
+
+  // Create a new post
+  createPost: async (userId: string, content: string, image?: File): Promise<Post> => {
+    try {
+      const formData = new FormData();
+      formData.append('user_id', userId);
+      formData.append('content', content);
+      if (image) formData.append('image', image);
+
+      const response = await fetch(`${API_BASE_URL}/api/posts`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create post: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error creating post:', error);
+      throw error;
+    }
+  },
+
+  // Update a post
+  updatePost: async (postId: string, content: string, image?: File): Promise<Post> => {
+    try {
+      const formData = new FormData();
+      formData.append('content', content);
+      if (image) formData.append('image', image);
+
+      const response = await fetch(`${API_BASE_URL}/api/posts/${postId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update post: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error updating post:', error);
+      throw error;
+    }
+  },
+
+  // Delete a post
+  deletePost: async (postId: string): Promise<void> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/posts/${postId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete post: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      throw error;
+    }
+  },
+
+  // Search posts by content
+  searchPosts: async (keyword: string, userId?: string, page = 0, size = 10): Promise<PaginatedResponse<Post>> => {
+    try {
+      const url = new URL(`${API_BASE_URL}/api/posts/search`);
+      url.searchParams.append('keyword', keyword);
+      url.searchParams.append('page', page.toString());
+      url.searchParams.append('size', size.toString());
+      if (userId) url.searchParams.append('userId', userId);
+
+      const response = await fetch(url.toString(), {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to search posts: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        content: data.posts || [],
+        currentPage: data.currentPage,
+        totalItems: data.totalItems,
+        totalPages: data.totalPages
+      };
+    } catch (error) {
+      console.error('Error searching posts:', error);
+      throw error;
+    }
+  },
+
+  // Like a post
+  likePost: async (postId: string, userId: string): Promise<number> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/posts/${postId}/like`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_id: userId }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        
+        // Try to parse the error message
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.message || `Failed to like post: ${response.statusText}`);
+        } catch (parseError) {
+          // If can't parse, use the original error
+          throw new Error(`Failed to like post: ${response.statusText}`);
+        }
+      }
+
+      const data = await response.json();
+      return data.likeCount;
+    } catch (error) {
+      console.error('Error liking post:', error);
+      throw error;
+    }
+  },
+
+  // Unlike a post
+  unlikePost: async (postId: string, userId: string): Promise<number> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/posts/${postId}/unlike`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_id: userId }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        
+        // Try to parse the error message
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.message || `Failed to unlike post: ${response.statusText}`);
+        } catch (parseError) {
+          // If can't parse, use the original error
+          throw new Error(`Failed to unlike post: ${response.statusText}`);
+        }
+      }
+
+      const data = await response.json();
+      return data.likeCount;
+    } catch (error) {
+      console.error('Error unliking post:', error);
+      throw error;
+    }
+  }
+};
+
+// Comment API service
+export const commentApi = {
+  // Get comments for a post
+  getComments: async (postId: string, page = 0, size = 10): Promise<PaginatedResponse<Comment>> => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/posts/${postId}/comments?page=${page}&size=${size}`,
+        {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch comments: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        content: data.comments || [],
+        currentPage: data.currentPage,
+        totalItems: data.totalItems,
+        totalPages: data.totalPages
+      };
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      throw error;
+    }
+  },
+
+  // Add a comment to a post
+  addComment: async (postId: string, userId: string, content: string): Promise<Comment> => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/posts/${postId}/comments`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            user_id: userId,
+            content 
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`Failed to add comment: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      // Return the correct data structure from the backend response
+      return data.data;
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      throw error;
+    }
+  },
+
+  // Update a comment
+  updateComment: async (commentId: string, content: string): Promise<Comment> => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/comments/${commentId}`,
+        {
+          method: 'PUT',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ content }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to update comment: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.comment;
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      throw error;
+    }
+  },
+
+  // Delete a comment
+  deleteComment: async (commentId: string): Promise<void> => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/comments/${commentId}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete comment: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      throw error;
+    }
+  },
+
+  // Add a reply to a comment
+  addReply: async (commentId: string, userId: string, content: string): Promise<Comment> => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/comments/${commentId}/replies`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            user_id: userId,
+            content 
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`Failed to add reply: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error adding reply:', error);
+      throw error;
+    }
+  },
+
+  // Like a comment
+  likeComment: async (commentId: string, userId: string): Promise<void> => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/comments/${commentId}/like`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ user_id: userId }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`Failed to like comment: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error liking comment:', error);
+      throw error;
+    }
+  },
+
+  // Unlike a comment
+  unlikeComment: async (commentId: string, userId: string): Promise<void> => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/comments/${commentId}/unlike`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ user_id: userId }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`Failed to unlike comment: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error unliking comment:', error);
+      throw error;
+    }
+  }
 }; 
