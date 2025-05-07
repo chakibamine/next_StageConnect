@@ -48,6 +48,7 @@ import EditItemDialog from "@/components/profile/EditItemDialog";
 import { useRoute, useLocation } from "wouter"; // Import wouter routing hooks
 import { Link } from "wouter";
 import axios from "axios";
+import { connectionService } from "@/services/connectionService";
 
 // Define employer profile interfaces
 interface CompanyInfo {
@@ -566,6 +567,22 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
     responsibility: company.name + " is committed to making a positive impact beyond our business operations. We have implemented sustainable practices throughout our organization, supported local community initiatives, and established a foundation that focuses on improving technology education and access for underserved communities."
   });
   
+  // Add state for connection status
+  const [connectionStatus, setConnectionStatus] = useState<"none" | "pending" | "connected">("none");
+
+  // Add a function to check connection status
+  const checkConnectionStatus = async (profileId: string) => {
+    if (!user || !user.id || profileId === user.id.toString()) return;
+    
+    try {
+      const status = await connectionService.checkConnectionStatus(user.id, parseInt(profileId));
+      setConnectionStatus(status.status.toLowerCase() as "none" | "pending" | "connected");
+    } catch (error) {
+      console.error("Error checking connection status:", error);
+      setConnectionStatus("none");
+    }
+  };
+
   // Fetch company data
   const fetchCompanyData = async (id: string) => {
     try {
@@ -692,6 +709,11 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
         const parsedProfileId = parseInt(profileId);
         setIsOwnProfile(user?.company_id === parsedProfileId);
         console.log('Profile ownership set:', user?.company_id === parsedProfileId);
+
+        // Check connection status
+        if (user && user.id && profileId !== user.id.toString()) {
+          await checkConnectionStatus(profileId);
+        }
 
       } catch (error) {
         console.error('Error fetching profile data:', error);
@@ -1148,19 +1170,62 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
     navigate(`/company/${id}`);
   };
 
-  // Update the handleConnect function to use parseInt
+  // Update the handleConnect function to use the connectionService
   const handleConnect = async (profileId: string) => {
     try {
       const parsedProfileId = parseInt(profileId);
-      // Implement connection logic here
-      toast({
-        title: "Connection Request Sent",
-        description: "Your connection request has been sent successfully.",
-      });
+      
+      if (!user || !user.id) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to connect with this company.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Check if already connected
+      if (connectionStatus === "connected") {
+        toast({
+          title: "Already Connected",
+          description: "You are already connected with this company.",
+        });
+        return;
+      }
+      
+      // Check if request already pending
+      if (connectionStatus === "pending") {
+        toast({
+          title: "Request Pending",
+          description: "Your connection request is already pending.",
+        });
+        return;
+      }
+      
+      // Send connection request through the API
+      const response = await connectionService.sendConnectionRequest(user.id, parsedProfileId);
+      
+      if (response.success) {
+        setConnectionStatus("pending");
+        toast({
+          title: "Connection Request Sent",
+          description: "Your connection request has been sent successfully.",
+        });
+      } else {
+        throw new Error(response.message || "Failed to send connection request");
+      }
     } catch (error) {
+      console.error("Failed to send connection request:", error);
+      let errorMsg = "Failed to send connection request. Please try again.";
+      
+      // Extract more specific error message if available
+      if (error instanceof Error) {
+        errorMsg = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to send connection request. Please try again.",
+        description: errorMsg,
         variant: "destructive",
       });
     }
@@ -1168,9 +1233,17 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
 
   // Update the handleMessage function to use parseInt
   const handleMessage = (profileId: string) => {
-    const parsedProfileId = parseInt(profileId);
-    // Navigate to messaging page with the selected user
-    navigate(`/messaging?user=${parsedProfileId}`);
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to message this company.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Redirect to messaging interface with this company
+    navigate(`/messages?recipient=${profileId}`);
   };
 
   // Add dialog state handlers
@@ -1321,15 +1394,24 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
                     </Button>
                   ) : (
                     <div className="flex space-x-2">
-                      <Button 
-                        variant={isFollowing ? "outline" : "default"}
-                        onClick={handleFollow}
-                      >
-                        {isFollowing ? "Following" : "Follow"}
-                      </Button>
-                      <Button variant="outline" onClick={handleSendMessage}>
-                        <MessageCircleIcon className="h-4 w-4 mr-2" /> Message
-                      </Button>
+                      {connectionStatus === "connected" ? (
+                        <div className="flex space-x-2">
+                          <Button variant="outline">
+                            <CheckIcon className="h-4 w-4 mr-2" /> Connected
+                          </Button>
+                          <Button variant="outline" onClick={() => handleMessage(profileId)}>
+                            <MessageCircleIcon className="h-4 w-4 mr-2" /> Message
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button 
+                          variant={connectionStatus === "pending" ? "outline" : "default"}
+                          disabled={connectionStatus === "pending"}
+                          onClick={() => handleConnect(profileId)}
+                        >
+                          {connectionStatus === "pending" ? "Request Pending" : "Connect"}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2547,21 +2629,33 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
           <CardContent>
             <div className="space-y-4">
               <div className="flex justify-between">
-                <Button 
-                  className="w-[48%]" 
-                  onClick={handleFollow}
-                  variant={isFollowing ? "outline" : "default"}
-                >
-                  {isFollowing ? "Following" : "Follow"}
-                </Button>
-                <Button 
-                  className="w-[48%]" 
-                  variant="outline" 
-                  onClick={handleSendMessage}
-                >
-                  <MessageCircleIcon className="h-4 w-4 mr-2" /> 
-                  Message
-                </Button>
+                {connectionStatus === "connected" ? (
+                  <div className="flex w-full justify-between">
+                    <Button 
+                      className="w-[48%]" 
+                      variant="outline"
+                    >
+                      <CheckIcon className="h-4 w-4 mr-2" /> Connected
+                    </Button>
+                    <Button 
+                      className="w-[48%]" 
+                      variant="outline" 
+                      onClick={() => handleMessage(profileId)}
+                    >
+                      <MessageCircleIcon className="h-4 w-4 mr-2" /> 
+                      Message
+                    </Button>
+                  </div>
+                ) : (
+                  <Button 
+                    className="w-full" 
+                    onClick={() => handleConnect(profileId)}
+                    disabled={connectionStatus === "pending"}
+                    variant={connectionStatus === "pending" ? "outline" : "default"}
+                  >
+                    {connectionStatus === "pending" ? "Request Pending" : "Connect with " + company.name}
+                  </Button>
+                )}
               </div>
               
               <div className="space-y-2 py-2 border-t">

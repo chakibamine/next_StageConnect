@@ -26,7 +26,8 @@ import {
   EyeIcon,
   TrashIcon,
   XIcon,
-  MessageCircleIcon
+  MessageCircleIcon,
+  CheckIcon
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
@@ -47,6 +48,7 @@ import type { Education, EducationFormData } from '../types/education';
 import type { Certification, CertificationFormData } from '../types/certification';
 import { Experience, ExperienceFormData } from '../types/experience';
 import { experienceService } from '../services/experienceService';
+import { connectionService } from "../services/connectionService";
 
 interface ProfileProps {
   id?: string;
@@ -239,6 +241,30 @@ const Profile = ({ id }: ProfileProps) => {
 
   // Add this near the top where other state variables are defined
   const [educations, setEducations] = useState<Education[]>([]);
+
+  // Add state for connection status in Profile component
+  const [connectionStatus, setConnectionStatus] = useState<"none" | "pending" | "connected">("none");
+
+  // Add a function to check connection status
+  const checkConnectionStatus = async (profileId: number) => {
+    if (!user || !user.id || user.id === profileId) return;
+    
+    try {
+      const status = await connectionService.checkConnectionStatus(user.id, profileId);
+      setConnectionStatus(status.status.toLowerCase() as "none" | "pending" | "connected");
+    } catch (error) {
+      console.error("Error checking connection status:", error);
+      setConnectionStatus("none");
+    }
+  };
+
+  // Add this to the useEffect that loads profile data
+  useEffect(() => {
+    if (id && user && user.id !== parseInt(id)) {
+      const profileId = parseInt(id);
+      checkConnectionStatus(profileId);
+    }
+  }, [id, user]);
 
   // Add this to your useEffect section
   useEffect(() => {
@@ -599,15 +625,58 @@ const Profile = ({ id }: ProfileProps) => {
   const handleConnect = async (profileId: string) => {
     try {
       const parsedProfileId = parseInt(profileId);
-      // Implement connection logic here
-      toast({
-        title: "Connection Request Sent",
-        description: "Your connection request has been sent successfully.",
-      });
+      
+      if (!user || !user.id) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to connect with other users.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Check if already connected
+      if (connectionStatus === "connected") {
+        toast({
+          title: "Already Connected",
+          description: "You are already connected with this user.",
+        });
+        return;
+      }
+      
+      // Check if request already pending
+      if (connectionStatus === "pending") {
+        toast({
+          title: "Request Pending",
+          description: "Your connection request is already pending.",
+        });
+        return;
+      }
+      
+      // Send connection request through the API
+      const response = await connectionService.sendConnectionRequest(user.id, parsedProfileId);
+      
+      if (response.success) {
+        setConnectionStatus("pending");
+        toast({
+          title: "Connection Request Sent",
+          description: "Your connection request has been sent successfully.",
+        });
+      } else {
+        throw new Error(response.message || "Failed to send connection request");
+      }
     } catch (error) {
+      console.error("Failed to send connection request:", error);
+      let errorMsg = "Failed to send connection request. Please try again.";
+      
+      // Extract more specific error message if available
+      if (error instanceof Error) {
+        errorMsg = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to send connection request. Please try again.",
+        description: errorMsg,
         variant: "destructive",
       });
     }
@@ -673,12 +742,21 @@ const Profile = ({ id }: ProfileProps) => {
                   </Button>
                 ) : (
                   <div className="flex space-x-2">
-                    <Button variant="outline" onClick={() => handleConnect(profile.id.toString())}>
-                      <UserPlusIcon className="h-4 w-4 mr-2" /> Connect
+                    <Button 
+                      variant={connectionStatus === "connected" ? "outline" : "default"}
+                      disabled={connectionStatus === "pending"}
+                      onClick={() => handleConnect(profile.id.toString())}
+                    >
+                      {connectionStatus === "connected" && <CheckIcon className="h-4 w-4 mr-2" />}
+                      {connectionStatus === "pending" && "Request Pending"}
+                      {connectionStatus === "none" && <UserPlusIcon className="h-4 w-4 mr-2" />}
+                      {connectionStatus === "connected" ? "Connected" : connectionStatus === "none" ? "Connect" : ""}
                     </Button>
-                    <Button variant="outline" onClick={() => handleMessage(profile.id.toString())}>
-                      <MessageCircleIcon className="h-4 w-4 mr-2" /> Message
-                    </Button>
+                    {connectionStatus === "connected" && (
+                      <Button variant="outline" onClick={() => handleMessage(profile.id.toString())}>
+                        <MessageCircleIcon className="h-4 w-4 mr-2" /> Message
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
