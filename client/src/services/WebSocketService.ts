@@ -27,7 +27,6 @@ class WebSocketService {
   private connecting = false;
   private connectionPromise: Promise<void> | null = null;
   private reconnectTimeout: NodeJS.Timeout | null = null;
-  private heartbeatInterval: NodeJS.Timeout | null = null;
   private subscriptions: { [key: string]: any } = {};
   private messageHandlers: { [key: string]: (message: any) => void } = {};
   private eventListeners: { [key in WebSocketEventType]?: EventHandler[] } = {};
@@ -154,9 +153,6 @@ class WebSocketService {
             
             // Send join message to notify server
             this.sendJoinMessage(userId);
-            
-            // Setup heartbeat
-            this.setupHeartbeat(userId);
           } catch (error) {
             console.error('Error after connection:', error);
           }
@@ -283,29 +279,10 @@ class WebSocketService {
    * Send a join message when connecting
    */
   private sendJoinMessage(userId: number) {
-    if (!this.connected || !this.stompClient) return;
-    
-    // Get user information from localStorage if available
-    let userName = 'User';
-    try {
-      const userJson = localStorage.getItem('user');
-      if (userJson) {
-        const user = JSON.parse(userJson);
-        if (user && user.name) {
-          userName = user.name;
-        } else if (user && user.firstName) {
-          userName = `${user.firstName} ${user.lastName || ''}`.trim();
-        }
-      }
-    } catch (e) {
-      console.error('Error parsing user from localStorage:', e);
-    }
-    
     const joinMessage = {
       type: 'JOIN',
       senderId: userId,
-      content: `${userName} is online`,
-      senderName: userName,
+      content: 'User connected',
       timestamp: new Date()
     };
     
@@ -507,12 +484,6 @@ class WebSocketService {
       this.reconnectTimeout = null;
     }
     
-    // Clear heartbeat interval
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
-    }
-    
     this.connected = false;
     this.connecting = false;
     this.connectionPromise = null;
@@ -527,27 +498,6 @@ class WebSocketService {
    */
   isConnected() {
     return this.connected;
-  }
-  
-  /**
-   * Send a heartbeat to maintain online status
-   */
-  private setupHeartbeat(userId: number) {
-    // Clear any existing heartbeat
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-    }
-    
-    // Set up a new heartbeat interval
-    this.heartbeatInterval = setInterval(() => {
-      if (this.connected && this.userId) {
-        this.sendMessage('/app/chat.heartbeat', {
-          type: 'HEARTBEAT',
-          senderId: userId,
-          timestamp: new Date()
-        });
-      }
-    }, 30000); // Send heartbeat every 30 seconds
   }
 }
 

@@ -209,22 +209,14 @@ const ConversationsList = ({
                   </Avatar>
                   
                   {conversation.user.isOnline && (
-                    <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white">
-                      <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping"></span>
-                    </span>
+                    <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white"></span>
                   )}
                 </div>
                 
                 <div className="flex-grow min-w-0">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-medium truncate text-neutral-800 flex items-center">
+                    <h3 className="font-medium truncate text-neutral-800">
                       {conversation.user.name}
-                      {conversation.user.isOnline && (
-                        <span className="ml-1.5 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full flex items-center">
-                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></span>
-                          Online
-                        </span>
-                      )}
                     </h3>
                     <span className="text-xs text-neutral-500 whitespace-nowrap ml-2">
                       {getRelativeTime(conversation.lastMessage.timestamp)}

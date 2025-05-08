@@ -496,7 +496,7 @@ const Messaging = () => {
     }
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/messages/conversation/${currentUserId}/${partnerId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/messages/${currentUserId}/${partnerId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         }

@@ -51,6 +51,7 @@ interface Connection {
   status?: string;
 }
 
+// API base URL
 const API_BASE_URL = "http://localhost:8080";
 
 // Default values for new conversations
@@ -274,63 +275,36 @@ const Messaging = () => {
       if (data.success && data.conversations) {
         // Transform backend data to our Conversation format
         const formattedConversations = data.conversations.map((conv: {
-          partnerId: number;
-          partnerName?: string;
-          partnerFirstName?: string;
-          partnerLastName?: string;
-          partnerPhoto?: string;
-          lastMessage?: {
+          id: string;
+          user: {
+            id: number;
+            name: string;
+            profilePicture: string | null;
+            online: boolean;
+          };
+          lastMessage: {
             content: string;
             timestamp: string;
             read: boolean;
           };
-          unreadCount?: number;
-          messages?: Array<any>;
+          unreadCount: number;
+          messages: any[] | null;
         }) => {
-          // Use all available name sources with fallbacks
-          let partnerName = "Unknown User";
-          
-          // Prefer explicit partnerName from API
-          if (conv.partnerName) {
-            partnerName = conv.partnerName;
-          } 
-          // Next try firstName + lastName 
-          else if (conv.partnerFirstName || conv.partnerLastName) {
-            partnerName = `${conv.partnerFirstName || ''} ${conv.partnerLastName || ''}`.trim();
-          }
-          // Last resort - use ID
-          else if (conv.partnerId) {
-            partnerName = `User ${conv.partnerId}`;
-          }
-          
-          // Check if we already have this user in connections and use that name if available
-          const connection = userConnections.find(c => c.userId === conv.partnerId);
-          if (connection && connection.name && connection.name !== 'No Name') {
-            partnerName = connection.name;
-          }
-
           return {
-            id: conv.partnerId,
-      user: {
-              id: conv.partnerId,
-              name: partnerName,
-              profilePicture: conv.partnerPhoto || (connection?.profilePicture) || undefined,
-        isOnline: false,
-      },
-      lastMessage: {
+            id: conv.user.id, // Use user ID as conversation ID
+            user: {
+              id: conv.user.id,
+              name: conv.user.name || `User ${conv.user.id}`,
+              profilePicture: conv.user.profilePicture || undefined,
+              isOnline: conv.user.online || false,
+            },
+            lastMessage: {
               content: conv.lastMessage?.content || "No messages yet",
-              timestamp: conv.lastMessage?.timestamp ? new Date(conv.lastMessage.timestamp) : new Date(),
+              timestamp: new Date(conv.lastMessage?.timestamp || new Date()),
               isRead: conv.lastMessage?.read || true,
             },
             unreadCount: conv.unreadCount || 0,
-            messages: conv.messages?.map((msg: any) => ({
-              id: msg.id || Math.floor(Math.random() * 10000),
-              content: msg.content || '',
-              timestamp: new Date(msg.timestamp || Date.now()),
-              senderId: msg.senderId || 0,
-              receiverId: msg.receiverId || 0,
-              senderName: msg.senderName || '',
-            })) || [],
+            messages: [], // Messages are loaded separately when conversation is selected
           };
         });
         
@@ -350,7 +324,6 @@ const Messaging = () => {
               return {
                 ...newConv,
                 messages: existing.messages.length > 0 ? existing.messages : newConv.messages,
-                unreadCount: existing.unreadCount,
                 // Always prefer the better name
                 user: {
                   ...newConv.user,
@@ -456,13 +429,8 @@ const Messaging = () => {
         break;
         
       case 'JOIN':
-        // Update online status when user joins
-        handleOnlineStatus(message.senderId, true);
-        break;
-        
       case 'LEAVE':
-        // Update online status when user leaves
-        handleOnlineStatus(message.senderId, false);
+        // Update online status (optional)
         break;
     }
   }, []);
@@ -482,11 +450,6 @@ const Messaging = () => {
     
     // Don't process if message doesn't involve current user
     if (currentUserId !== senderId && currentUserId !== receiverId) return;
-    
-    // Update online status when receiving a message
-    if (senderId !== currentUserId) {
-      handleOnlineStatus(senderId, true);
-    }
     
     // Determine which user ID is the other party in this conversation
     const otherUserId = currentUserId === senderId ? receiverId : senderId;
@@ -601,34 +564,9 @@ const Messaging = () => {
     }
   }, [currentUserId, activeConversationId, userConnections, sendReadReceipt]);
   
-  // Handle online status updates
-  const handleOnlineStatus = useCallback((userId: number, isOnline: boolean) => {
-    if (!currentUserId || !isConnected) return;
-    
-    setConversations(prevConversations => {
-      return prevConversations.map(conv => {
-        if (conv.id === userId) {
-          return {
-            ...conv,
-            user: {
-              ...conv.user,
-              isOnline: isOnline
-            }
-          };
-        }
-        return conv;
-      });
-    });
-  }, [currentUserId, isConnected]);
-  
   // Handle read receipts
   const handleReadReceipt = useCallback((message: any) => {
     const { senderId, receiverId } = message;
-    
-    // If user is sending read receipts, they are online
-    if (senderId !== currentUserId) {
-      handleOnlineStatus(senderId, true);
-    }
     
     // If current user sent the messages that were read
     if (currentUserId === senderId) {
@@ -657,7 +595,7 @@ const Messaging = () => {
         return updatedConversations;
       });
     }
-  }, [currentUserId, handleOnlineStatus]);
+  }, [currentUserId]);
 
   // Handle typing indicators
   const handleTypingIndicator = useCallback((message: any) => {
@@ -688,24 +626,39 @@ const Messaging = () => {
     if (!partnerId || currentUserId === null) return;
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/messages/conversation/${currentUserId}/${partnerId}`, {
+      // Generate conversation ID for the API call
+      const conversationId = generateConversationId(currentUserId, partnerId);
+      
+      // Use the new conversation ID endpoint to fetch messages
+      const response = await fetch(`${API_BASE_URL}/api/messages/conversation/${conversationId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         }
       });
       
-      let conversationData = { messages: [] };
+      let conversationData: any = { messages: [] };
       
       if (response.status === 404) {
-        // Conversation doesn't exist yet on the server - this is okay
+        // Conversation doesn't exist yet on the server - create empty conversation
         conversationData = { messages: [] };
       } else if (response.ok) {
         // Successfully fetched conversation
         const data = await response.json();
         
-        if (data.success && data.conversation) {
-          conversationData = data.conversation;
+        if (data.success && data.messages) {
+          // Format the data structure to match our expectation
+          conversationData = { 
+            messages: data.messages,
+            user: {
+              id: partnerId,
+              name: '', // Will be filled from existing conversation data
+              isOnline: false
+            }
+          };
         }
+      } else {
+        console.error("Error fetching conversation:", response.status);
+        throw new Error(`Error fetching conversation: ${response.status}`);
       }
       
       // Create a placeholder message if no messages
@@ -718,34 +671,52 @@ const Messaging = () => {
           receiverId: 0,
           senderName: 'System',
           isSystem: true
-        }] as any; // Use type assertion to bypass type error
+        }];
       }
       
-      // Update the specific conversation with message history (empty or loaded)
+      // Format received messages
+      const formattedMessages = Array.isArray(conversationData.messages) 
+        ? conversationData.messages.map((msg: any) => ({
+            id: msg.id || Math.floor(Math.random() * 10000),
+            content: msg.content || '',
+            timestamp: new Date(msg.timestamp || Date.now()),
+            senderId: msg.senderId || 0,
+            receiverId: msg.receiverId || 0,
+            senderName: msg.senderName || '',
+            isSystem: msg.isSystem || false
+          }))
+        : [];
+      
+      // Update the conversation with messages
       setConversations(prevConversations => {
         return prevConversations.map(conv => {
           if (conv.id === partnerId) {
+            // Extract partner info from conversation data if available
+            const partnerInfo = conversationData.user || {
+              id: partnerId,
+              name: conv.user.name
+            };
+            
             return {
               ...conv,
+              user: {
+                ...conv.user,
+                name: partnerInfo.name || conv.user.name,
+                profilePicture: partnerInfo.profilePicture || conv.user.profilePicture,
+                isOnline: partnerInfo.online || conv.user.isOnline
+              },
               unreadCount: 0,
               lastMessage: {
                 ...conv.lastMessage,
                 isRead: true
               },
-              messages: conversationData.messages?.map((msg: any) => ({
-                id: msg.id || Math.floor(Math.random() * 10000),
-                content: msg.content || '',
-                timestamp: new Date(msg.timestamp || Date.now()),
-                senderId: msg.senderId || 0,
-                receiverId: msg.receiverId || 0,
-                senderName: msg.senderName || '',
-                isSystem: msg.isSystem || false
-              })) || []
+              messages: formattedMessages
             };
           }
           return conv;
         });
       });
+      
     } catch (error) {
       console.error("Error fetching conversation details:", error);
       
@@ -768,7 +739,7 @@ const Messaging = () => {
                 receiverId: 0,
                 senderName: 'System',
                 isSystem: true
-              } as Message] // Cast as Message type
+              } as Message]
             };
           }
           return conv;
@@ -799,10 +770,26 @@ const Messaging = () => {
       )
     );
     
+    // Mark messages as read on server and send read receipt through WebSocket
+    markMessagesAsRead(conversationId);
+  };
+
+  // Mark messages as read both on server and via WebSocket
+  const markMessagesAsRead = (partnerId: number) => {
+    if (!currentUserId || !partnerId) return;
+    
+    // Send read receipt through API
+    fetch(`${API_BASE_URL}/api/messages/read/${currentUserId}/${partnerId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+      }
+    }).catch(err => console.error("Error marking messages as read:", err));
+    
     // Send read receipt through WebSocket
     if (isConnected) {
-      const conversation = conversations.find(c => c.id === conversationId);
-      if (conversation && conversation.user && conversation.user.id) {
+      const conversation = conversations.find(c => c.id === partnerId);
+      if (conversation?.user?.id) {
         const receiverId = Number(conversation.user.id);
         
         // Generate conversation ID
@@ -830,6 +817,39 @@ const Messaging = () => {
     }
     
     try {
+      // Add message to UI immediately for responsive experience
+      const tempMessageId = Date.now();
+      const tempMessage: Message = {
+        id: tempMessageId,
+        content,
+        timestamp: new Date(),
+        senderId: currentUserId,
+        receiverId: conversationId,
+        senderName: user ? `${user.firstName} ${user.lastName}` : 'You',
+        isSystem: false
+      };
+      
+      // Update conversation with new message
+      setConversations(prevConversations => 
+        prevConversations.map(conv => {
+          if (conv.id === conversationId) {
+            // Add message to conversation
+            const updatedMessages = [...conv.messages, tempMessage];
+            
+            return {
+              ...conv,
+              messages: updatedMessages,
+              lastMessage: {
+                content,
+                timestamp: new Date(),
+                isRead: false
+              }
+            };
+          }
+          return conv;
+        })
+      );
+      
       // Send message via WebSocket
       const success = WebSocketService.sendChatMessage(conversationId, content);
       
