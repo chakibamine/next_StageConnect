@@ -24,7 +24,8 @@ const Header = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const isMobile = useIsMobile();
   const [scrolled, setScrolled] = useState(false);
-
+  console.log("user : ", user);
+  
   // Handle scroll effect for shadow
   useEffect(() => {
     const handleScroll = () => {

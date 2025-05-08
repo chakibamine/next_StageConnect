@@ -18,6 +18,12 @@ interface Message {
   senderName?: string;
   isSystem?: boolean;
   localMessage?: boolean;
+  // File attachment properties
+  hasAttachment?: boolean;
+  attachmentType?: 'pdf' | 'image' | 'file';
+  attachmentUrl?: string; 
+  attachmentName?: string;
+  attachmentSize?: number;
 }
 
 interface Conversation {
@@ -849,19 +855,50 @@ const Messaging = () => {
     }
   };
 
-  const handleSendMessage = (conversationId: number, content: string) => {
+  const handleSendMessage = (conversationId: number, content: string, file?: File) => {
     if (!currentUserId || !isConnected) {
       console.error("Cannot send message: Not connected");
       return false;
     }
     
-    if (!content.trim()) {
+    // Require either content or file
+    if (!content.trim() && !file) {
       return false;
     }
     
     try {
       // Generate a unique ID for this message that we can use to detect echoes
       const messageId = `local_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      
+      // Create file data if we have a file
+      let fileData: {
+        hasAttachment: boolean,
+        attachmentType?: 'pdf' | 'image' | 'file',
+        attachmentUrl?: string,
+        attachmentName?: string,
+        attachmentSize?: number
+      } = { hasAttachment: false };
+      
+      if (file) {
+        // Determine file type
+        let attachmentType: 'pdf' | 'image' | 'file' = 'file';
+        if (file.type.includes('pdf')) {
+          attachmentType = 'pdf';
+        } else if (file.type.includes('image')) {
+          attachmentType = 'image';
+        }
+        
+        // Create a temporary URL for the file for immediate preview
+        const tempUrl = URL.createObjectURL(file);
+        
+        fileData = {
+          hasAttachment: true,
+          attachmentType,
+          attachmentUrl: tempUrl,
+          attachmentName: file.name,
+          attachmentSize: file.size
+        };
+      }
       
       // Add message to UI immediately for responsive experience
       const tempMessage: Message = {
@@ -872,8 +909,9 @@ const Messaging = () => {
         receiverId: conversationId,
         senderName: user ? `${user.firstName} ${user.lastName}` : 'You',
         isSystem: false,
-        // Mark as locally generated to handle echoes
-        localMessage: true
+        localMessage: true,
+        // Add file data if present
+        ...fileData
       };
       
       // Update conversation with new message
@@ -887,7 +925,7 @@ const Messaging = () => {
               ...conv,
               messages: updatedMessages,
               lastMessage: {
-                content,
+                content: file ? `${file.name}${content ? `: ${content}` : ''}` : content,
                 timestamp: new Date(),
                 isRead: false
               }
@@ -897,8 +935,94 @@ const Messaging = () => {
         })
       );
       
+      // If we have a file, upload it first and get the permanent URL
+      if (file) {
+        // Create form data for file upload
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('senderId', currentUserId.toString());
+        formData.append('receiverId', conversationId.toString());
+        formData.append('messageId', messageId);
+        if (content) {
+          formData.append('content', content);
+        }
+        
+        // Start file upload in background
+        fetch(`${API_BASE_URL}/api/messages/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+          },
+          body: formData
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`File upload failed with status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          // Update message with permanent URL
+          if (data.success && data.fileUrl) {
+            // Update the message in the conversation with the permanent URL
+            setConversations(prevConversations => 
+              prevConversations.map(conv => {
+                if (conv.id === conversationId) {
+                  return {
+                    ...conv,
+                    messages: conv.messages.map(msg => {
+                      if (msg.id === messageId) {
+                        return {
+                          ...msg,
+                          attachmentUrl: data.fileUrl
+                        };
+                      }
+                      return msg;
+                    })
+                  };
+                }
+                return conv;
+              })
+            );
+          }
+        })
+        .catch(error => {
+          console.error('Error uploading file:', error);
+          // Show error in UI by updating the message
+          setConversations(prevConversations => 
+            prevConversations.map(conv => {
+              if (conv.id === conversationId) {
+                return {
+                  ...conv,
+                  messages: conv.messages.map(msg => {
+                    if (msg.id === messageId) {
+                      return {
+                        ...msg,
+                        content: `${msg.content || ''} (File upload failed. Please try again.)`,
+                        hasAttachment: false
+                      };
+                    }
+                    return msg;
+                  })
+                };
+              }
+              return conv;
+            })
+          );
+        });
+      }
+      
       // Send message via WebSocket with our local ID
-      const success = WebSocketService.sendMessageWithId(conversationId, content, messageId);
+      const success = WebSocketService.sendMessageWithId(
+        conversationId, 
+        content, 
+        messageId,
+        fileData.hasAttachment ? {
+          fileName: fileData.attachmentName || '',
+          fileType: fileData.attachmentType || 'file',
+          fileSize: fileData.attachmentSize || 0
+        } : undefined
+      );
       
       // Return whether send was successful
       return success;

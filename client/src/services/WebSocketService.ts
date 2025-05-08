@@ -464,7 +464,16 @@ class WebSocketService {
   /**
    * Send a chat message with a specific ID (for echo detection)
    */
-  sendMessageWithId(receiverId: number, content: string, messageId: string) {
+  sendMessageWithId(
+    receiverId: number, 
+    content: string, 
+    messageId: string,
+    fileData?: {
+      fileName: string,
+      fileType: 'pdf' | 'image' | 'file',
+      fileSize: number
+    }
+  ) {
     if (!this.userId) {
       console.error('Cannot send message: No user ID set');
       return false;
@@ -472,12 +481,17 @@ class WebSocketService {
     
     return this.sendMessage('/app/chat.sendMessage', {
       type: 'CHAT',
-      id: messageId, // Include our custom ID
       senderId: this.userId,
       receiverId,
       content,
+      id: messageId, // Include our custom ID
       conversationId: this.generateConversationId(this.userId, receiverId),
-      timestamp: new Date()
+      timestamp: new Date(),
+      // Include file data if present
+      hasAttachment: !!fileData,
+      attachmentType: fileData?.fileType,
+      attachmentName: fileData?.fileName,
+      attachmentSize: fileData?.fileSize
     });
   }
   
