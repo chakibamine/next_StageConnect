@@ -32,6 +32,9 @@ class WebSocketService {
   private eventListeners: { [key in WebSocketEventType]?: EventHandler[] } = {};
   private userId: number | null = null;
   private serverUrl = 'http://localhost:8080';
+  // Keep track of recent messages to detect duplicates
+  private recentMessageIds: Set<string> = new Set();
+  private messageExpiryTime = 5000; // 5 seconds
   
   /**
    * Register an event listener
@@ -226,6 +229,51 @@ class WebSocketService {
   }
   
   /**
+   * Check if a message is a duplicate we've recently processed
+   */
+  private isDuplicateMessage(message: any): boolean {
+    // Generate a unique ID for the message based on its properties
+    const messageId = this.generateMessageId(message);
+    
+    // If we've seen this message id before, it's a duplicate
+    if (this.recentMessageIds.has(messageId)) {
+      console.log('Duplicate message detected, ignoring:', message.content);
+      return true;
+    }
+    
+    // Add to recent message ids
+    this.recentMessageIds.add(messageId);
+    
+    // Set timeout to remove the message id after expiry time
+    setTimeout(() => {
+      this.recentMessageIds.delete(messageId);
+    }, this.messageExpiryTime);
+    
+    return false;
+  }
+  
+  /**
+   * Generate a consistent ID for a message for deduplication
+   */
+  private generateMessageId(message: any): string {
+    if (!message) return 'invalid_message';
+    
+    // If message has an ID, use it
+    if (message.id) return `id_${message.id}`;
+    
+    // Otherwise create a composite key from important fields
+    const senderId = message.senderId || 0;
+    const receiverId = message.receiverId || 0;
+    const content = message.content || '';
+    const timestamp = message.timestamp ? new Date(message.timestamp).getTime() : Date.now();
+    
+    // Round timestamp to nearest second for more reliable deduplication
+    const roundedTime = Math.floor(timestamp / 1000);
+    
+    return `${senderId}_${receiverId}_${content}_${roundedTime}`;
+  }
+  
+  /**
    * Subscribe to user-specific messages
    */
   private subscribeToUserMessages(userId: number) {
@@ -245,6 +293,12 @@ class WebSocketService {
       const subscription = this.stompClient.subscribe(destination, (message) => {
         try {
           const parsedMessage = JSON.parse(message.body);
+          
+          // Skip duplicate messages
+          if (this.isDuplicateMessage(parsedMessage)) {
+            return;
+          }
+          
           // Only trigger general event if no specific handlers are registered
           const hasMessageHandlers = Object.keys(this.messageHandlers).length > 0;
           
@@ -408,6 +462,26 @@ class WebSocketService {
   }
   
   /**
+   * Send a chat message with a specific ID (for echo detection)
+   */
+  sendMessageWithId(receiverId: number, content: string, messageId: string) {
+    if (!this.userId) {
+      console.error('Cannot send message: No user ID set');
+      return false;
+    }
+    
+    return this.sendMessage('/app/chat.sendMessage', {
+      type: 'CHAT',
+      id: messageId, // Include our custom ID
+      senderId: this.userId,
+      receiverId,
+      content,
+      conversationId: this.generateConversationId(this.userId, receiverId),
+      timestamp: new Date()
+    });
+  }
+  
+  /**
    * Send a typing indicator
    */
   sendTypingIndicator(receiverId: number, isTyping: boolean = true) {
@@ -468,6 +542,9 @@ class WebSocketService {
     // Clear subscriptions and handlers
     this.subscriptions = {};
     this.messageHandlers = {};
+    
+    // Clear message deduplication cache
+    this.recentMessageIds.clear();
     
     // Disconnect STOMP client
     if (this.stompClient && this.connected) {

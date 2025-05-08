@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import WebSocketService, { WebSocketEventType } from "@/services/WebSocketService";
 
 interface Message {
-  id: number;
+  id: string | number;
   content: string;
   timestamp: Date;
   senderId: number;
@@ -17,6 +17,7 @@ interface Message {
   conversationId?: string;
   senderName?: string;
   isSystem?: boolean;
+  localMessage?: boolean;
 }
 
 interface Conversation {
@@ -376,6 +377,9 @@ const Messaging = () => {
       const connectedHandler = () => setIsConnected(true);
       const disconnectedHandler = () => setIsConnected(false);
       
+      // First unregister any existing handlers to avoid duplicates
+      WebSocketService.unregisterMessageHandler('messaging');
+      
       // Register event listeners for connection state only
       WebSocketService.addEventListener(WebSocketEventType.CONNECTED, connectedHandler);
       WebSocketService.addEventListener(WebSocketEventType.DISCONNECTED, disconnectedHandler);
@@ -446,13 +450,52 @@ const Messaging = () => {
 
   // Handle incoming chat message
   const handleIncomingChatMessage = useCallback((message: any) => {
-    const { senderId, receiverId, content, timestamp, conversationId, senderName, senderPhoto } = message;
+    const { senderId, receiverId, content, timestamp, conversationId, senderName, senderPhoto, id } = message;
     
     // Don't process if message doesn't involve current user
     if (currentUserId !== senderId && currentUserId !== receiverId) return;
     
     // Determine which user ID is the other party in this conversation
     const otherUserId = currentUserId === senderId ? receiverId : senderId;
+    
+    // Check if this is a message we sent ourselves (echo detection)
+    if (senderId === currentUserId) {
+      // Check if the id matches our locally generated format
+      if (typeof id === 'string' && id.startsWith('local_')) {
+        // This is an echo of our own message, check if it already exists
+        const existingConversation = conversations.find(c => c.id === otherUserId);
+        
+        if (existingConversation) {
+          // Check if we already have a message with this ID
+          const existingMessage = existingConversation.messages.find(msg => 
+            msg.id === id || 
+            (msg.localMessage && msg.content === content && 
+             Math.abs(new Date(msg.timestamp).getTime() - new Date(timestamp).getTime()) < 5000)
+          );
+          
+          if (existingMessage) {
+            console.log("Ignoring echo of own message:", content);
+            return;
+          }
+        }
+      }
+      
+      // For other messages sent by this user, check by content and time
+      const existingConversation = conversations.find(c => c.id === otherUserId);
+      
+      if (existingConversation) {
+        const isDuplicate = existingConversation.messages.some(msg => 
+          msg.senderId === currentUserId && 
+          msg.content === content && 
+          Math.abs(new Date(msg.timestamp).getTime() - new Date(timestamp).getTime()) < 5000
+        );
+        
+        if (isDuplicate) {
+          console.log("Ignoring duplicate message:", content);
+          return;
+        }
+      }
+    }
     
     // Get the other user's details from connections if available
     const userConnection = userConnections.find(conn => conn.userId === otherUserId);
@@ -465,7 +508,7 @@ const Messaging = () => {
     
     // Format message
     const formattedMessage: Message = {
-      id: Date.now(), // Temporary ID until we reload
+      id: id || Date.now(), // Use server ID if available, or generate temp ID
       content,
       timestamp: new Date(timestamp),
       senderId,
@@ -475,7 +518,7 @@ const Messaging = () => {
       isSystem: false
     };
     
-    console.log("Formatting incoming message:", {
+    console.log("Processing incoming message:", {
       otherUserId,
       displayName,
       senderName, 
@@ -562,7 +605,7 @@ const Messaging = () => {
     if (otherUserId === activeConversationId && senderId !== currentUserId) {
       sendReadReceipt(senderId);
     }
-  }, [currentUserId, activeConversationId, userConnections, sendReadReceipt]);
+  }, [currentUserId, activeConversationId, userConnections, conversations, sendReadReceipt]);
   
   // Handle read receipts
   const handleReadReceipt = useCallback((message: any) => {
@@ -817,16 +860,20 @@ const Messaging = () => {
     }
     
     try {
+      // Generate a unique ID for this message that we can use to detect echoes
+      const messageId = `local_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      
       // Add message to UI immediately for responsive experience
-      const tempMessageId = Date.now();
       const tempMessage: Message = {
-        id: tempMessageId,
+        id: messageId, // Use our unique ID
         content,
         timestamp: new Date(),
         senderId: currentUserId,
         receiverId: conversationId,
         senderName: user ? `${user.firstName} ${user.lastName}` : 'You',
-        isSystem: false
+        isSystem: false,
+        // Mark as locally generated to handle echoes
+        localMessage: true
       };
       
       // Update conversation with new message
@@ -850,8 +897,8 @@ const Messaging = () => {
         })
       );
       
-      // Send message via WebSocket
-      const success = WebSocketService.sendChatMessage(conversationId, content);
+      // Send message via WebSocket with our local ID
+      const success = WebSocketService.sendMessageWithId(conversationId, content, messageId);
       
       // Return whether send was successful
       return success;
