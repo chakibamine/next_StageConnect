@@ -21,6 +21,7 @@ interface Conversation {
     isRead: boolean;
   };
   unreadCount: number;
+  isTyping?: boolean;
 }
 
 interface ConversationsListProps {
@@ -192,62 +193,65 @@ const ConversationsList = ({
           <div className="pb-16"> {/* Added padding at the bottom to prevent content from being hidden under the FAB */}
             {sortedConversations.map((conversation, index) => (
               <div 
-                key={conversation.id} 
-                className={`px-4 py-3 cursor-pointer transition-all duration-200 hover:bg-neutral-50 ${
-                  activeConversationId === conversation.id 
-                    ? 'bg-primary/5 border-l-4 border-l-primary pl-3' 
-                    : 'border-l-4 border-l-transparent'
-                } ${index === sortedConversations.length - 1 ? 'border-b' : 'border-b border-neutral-100'}`}
+                key={conversation.id}
+                className={`flex p-3 border-b hover:bg-neutral-50 cursor-pointer transition-colors duration-150 ${
+                  conversation.id === activeConversationId ? 'bg-neutral-100 hover:bg-neutral-100' : ''
+                }`}
                 onClick={() => onSelectConversation(conversation.id)}
               >
-                <div className="flex items-center space-x-3">
-                  <div className="relative flex-shrink-0">
-                    <Avatar className={`border-2 ${conversation.user.isOnline ? 'border-green-500' : 'border-transparent'}`}>
-                      <AvatarImage 
-                        src={conversation.user.profilePicture} 
-                        alt={conversation.user.name} 
-                      />
-                      <AvatarFallback className="bg-primary/20 text-primary font-medium">
-                        {conversation.user.name.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    {conversation.user.isOnline && (
-                      <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white flex items-center justify-center">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <div className="relative mr-3">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage 
+                      src={conversation.user.profilePicture} 
+                      alt={conversation.user.name} 
+                    />
+                    <AvatarFallback>{(conversation.user.name || '?').charAt(0).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  
+                  {conversation.user.isOnline && (
+                    <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white">
+                      <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping"></span>
+                    </span>
+                  )}
+                </div>
+                
+                <div className="flex-grow min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium truncate text-neutral-800 flex items-center">
+                      {conversation.user.name}
+                      {conversation.user.isOnline && (
+                        <span className="ml-1.5 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full flex items-center">
+                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></span>
+                          Online
+                        </span>
+                      )}
+                    </h3>
+                    <span className="text-xs text-neutral-500 whitespace-nowrap ml-2">
+                      {getRelativeTime(conversation.lastMessage.timestamp)}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-sm text-neutral-500 truncate flex-grow">
+                      {conversation.isTyping ? (
+                        <span className="flex items-center text-primary-600">
+                          <span className="mr-1">Typing</span>
+                          <span className="flex space-x-1">
+                            <span className="w-1 h-1 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                            <span className="w-1 h-1 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                            <span className="w-1 h-1 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                          </span>
+                        </span>
+                      ) : (
+                        getTruncatedMessage(conversation.lastMessage.content)
+                      )}
+                    </p>
+                    
+                    {conversation.unreadCount > 0 && (
+                      <span className="rounded-full bg-primary text-white text-xs px-2 ml-1.5 flex items-center justify-center min-w-[1.25rem] h-5">
+                        {conversation.unreadCount}
                       </span>
                     )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-center">
-                      <h3 className={`font-medium truncate ${
-                        conversation.unreadCount > 0 ? 'text-neutral-900' : 'text-neutral-700'
-                      }`}>
-                        {searchQuery 
-                          ? getHighlightedText(conversation.user.name, searchQuery)
-                          : conversation.user.name
-                        }
-                      </h3>
-                      <span className="text-xs text-neutral-500 flex-shrink-0 ml-1">
-                        {getRelativeTime(conversation.lastMessage.timestamp)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center mt-0.5">
-                      <p className={`text-xs truncate ${
-                        conversation.unreadCount > 0 
-                          ? 'text-neutral-800 font-medium' 
-                          : 'text-neutral-500'
-                      }`}>
-                        {searchQuery 
-                          ? getHighlightedText(getTruncatedMessage(conversation.lastMessage.content), searchQuery)
-                          : getTruncatedMessage(conversation.lastMessage.content)
-                        }
-                      </p>
-                      {conversation.unreadCount > 0 && (
-                        <Badge className="ml-1.5 bg-primary hover:bg-primary text-white text-[10px] rounded-full h-5 min-w-[20px] flex-shrink-0 flex items-center justify-center">
-                          {conversation.unreadCount}
-                        </Badge>
-                      )}
-                    </div>
                   </div>
                 </div>
               </div>

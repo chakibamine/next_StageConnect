@@ -26,4 +26,8 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
   },
+  define: {
+    // Polyfills for sockjs-client
+    global: 'window',
+  },
 });

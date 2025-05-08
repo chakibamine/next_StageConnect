@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PhoneIcon, VideoIcon, InfoIcon, PaperclipIcon, SendIcon, SmileIcon, ImageIcon, MicIcon } from "lucide-react";
 import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import WebSocketService from "@/services/WebSocketService";
 
 interface Message {
   id: number;
@@ -12,6 +13,8 @@ interface Message {
   timestamp: Date;
   senderId: number;
   receiverId: number;
+  senderName?: string;
+  isSystem?: boolean;
 }
 
 interface ConversationViewProps {
@@ -24,6 +27,7 @@ interface ConversationViewProps {
       isOnline: boolean;
     };
     messages: Message[];
+    isTyping?: boolean;
   };
   currentUserId: number;
   onSendMessage: (conversationId: number, content: string) => void;
@@ -36,6 +40,7 @@ const ConversationView = ({
 }: ConversationViewProps) => {
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -47,8 +52,50 @@ const ConversationView = ({
     if (newMessage.trim()) {
       onSendMessage(conversation.id, newMessage);
       setNewMessage("");
+      
+      // Send stopped typing indication
+      WebSocketService.sendTypingIndicator(conversation.id, false);
     }
   };
+  
+  // Handle typing indicator
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNewMessage(value);
+    
+    // Send typing indicator with debounce
+    if (value.trim()) {
+      // Clear previous timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Send typing indicator
+      WebSocketService.sendTypingIndicator(conversation.id, true);
+      
+      // Set timeout to stop typing indicator after 2 seconds of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        WebSocketService.sendTypingIndicator(conversation.id, false);
+      }, 2000);
+    } else {
+      // If input is empty, send stopped typing
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      WebSocketService.sendTypingIndicator(conversation.id, false);
+    }
+  };
+  
+  // Clean up typing timeout when component unmounts or conversation changes
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        // Send stopped typing when leaving conversation
+        WebSocketService.sendTypingIndicator(conversation.id, false);
+      }
+    };
+  }, [conversation.id]);
 
   // Group messages by date
   const groupedMessages: {[key: string]: Message[]} = {};
@@ -70,10 +117,12 @@ const ConversationView = ({
               src={conversation.user.profilePicture} 
               alt={conversation.user.name} 
             />
-            <AvatarFallback>{conversation.user.name.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{conversation.user.name?.charAt(0) || '?'}</AvatarFallback>
           </Avatar>
           {conversation.user.isOnline && (
-            <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white"></span>
+            <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping"></span>
+            </span>
           )}
         </div>
         
@@ -146,13 +195,25 @@ const ConversationView = ({
             </div>
             
             {messages.map((message) => {
+              // Handle system messages
+              if (message.isSystem) {
+                return (
+                  <div key={message.id} className="flex justify-center my-4">
+                    <div className="bg-neutral-100 text-neutral-600 text-xs px-3 py-2 rounded-lg">
+                      {message.content}
+                    </div>
+                  </div>
+                );
+              }
+              
               const isCurrentUser = message.senderId === currentUserId;
               const time = format(message.timestamp, 'h:mm a');
               const previousMessage = messages[messages.indexOf(message) - 1];
-              const isSameSender = previousMessage && previousMessage.senderId === message.senderId;
+              const isSameSender = previousMessage && previousMessage.senderId === message.senderId && !previousMessage.isSystem;
               const isLongAgo = previousMessage && 
                 (message.timestamp.getTime() - previousMessage.timestamp.getTime() > 5 * 60 * 1000);
               const showAvatar = !isCurrentUser && !isSameSender && !isLongAgo;
+              const showName = !isCurrentUser && (showAvatar || isLongAgo);
               
               return (
                 <div 
@@ -167,7 +228,7 @@ const ConversationView = ({
                             src={conversation.user.profilePicture} 
                             alt={conversation.user.name} 
                           />
-                          <AvatarFallback>{conversation.user.name.charAt(0)}</AvatarFallback>
+                          <AvatarFallback>{conversation.user.name?.charAt(0) || '?'}</AvatarFallback>
                         </Avatar>
                       )}
                     </div>
@@ -178,6 +239,11 @@ const ConversationView = ({
                       ? 'bg-primary text-white'
                       : 'bg-white shadow-sm'
                   }`}>
+                    {showName && message.senderName && (
+                      <p className="text-xs font-medium text-neutral-500 mb-1">
+                        {message.senderName || conversation.user.name}
+                      </p>
+                    )}
                     <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
                     <p className={`text-xs ${isCurrentUser ? 'text-primary-50' : 'text-neutral-400'} text-right mt-1`}>
                       {time}
@@ -188,6 +254,29 @@ const ConversationView = ({
             })}
           </div>
         ))}
+        
+        {/* Typing indicator */}
+        {conversation.isTyping && (
+          <div className="flex justify-start mb-2">
+            <div className="w-8 h-8 mt-1 mr-2 flex-shrink-0">
+              <Avatar className="h-8 w-8">
+                <AvatarImage 
+                  src={conversation.user.profilePicture} 
+                  alt={conversation.user.name} 
+                />
+                <AvatarFallback>{conversation.user.name?.charAt(0) || '?'}</AvatarFallback>
+              </Avatar>
+            </div>
+            <div className="bg-white shadow-sm rounded-2xl p-3 px-4 max-w-[85%] md:max-w-md">
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div ref={messagesEndRef} />
       </div>
       
@@ -209,7 +298,7 @@ const ConversationView = ({
             placeholder="Type a message..." 
             className="flex-grow rounded-full bg-neutral-100 border-0 focus-visible:ring-1 py-5 h-10"
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+            onChange={handleInputChange}
             autoComplete="off"
           />
           
