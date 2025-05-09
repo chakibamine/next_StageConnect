@@ -24,7 +24,7 @@ const Header = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const isMobile = useIsMobile();
   const [scrolled, setScrolled] = useState(false);
-  console.log("user : ", user);
+  console.log("user auth : ", user);
   
   // Handle scroll effect for shadow
   useEffect(() => {
@@ -89,7 +89,7 @@ const Header = () => {
         {
           icon: <BriefcaseIcon className="h-4 w-4 mr-2" />,
           label: "Company Profile",
-          href: `/company/${user.id}`
+          href: `/company/${user.company_id}`
         },
         {
           icon: <UserPlusIcon className="h-4 w-4 mr-2" />,

@@ -40,6 +40,7 @@ interface LoginResponse {
   userType: string;
   companyName?: string;
   company_id?: number;
+  companyId?: number;
   profile?: {
     profilePicture?: string;
   };
@@ -60,6 +61,9 @@ interface ValidateTokenResponse {
   firstName?: string;
   lastName?: string;
   userType?: string;
+  companyName?: string;
+  company_id?: number;
+  companyId?: number;
 }
 
 // Default context value with no-op functions
@@ -103,6 +107,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         fullName: `${userData.firstName} ${userData.lastName}`,
         lastLogin: new Date().toISOString()
       };
+      
+      // Make sure we log the data we're storing to help debug
+      console.log("Storing user data:", userDataToStore);
+      
       localStorage.setItem("user", JSON.stringify(userDataToStore));
       
       // Also set in memory
@@ -156,7 +164,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             console.warn("Token validation failed:", response.message);
             clearAuthData();
           } else {
-            console.log("Token validation successful");
+            console.log("Token validation successful", response);
+            
+            // Check if we have additional company data from validation that wasn't in localStorage
+            if (storedUser.role === "employer" && (response.company_id || response.companyId)) {
+              const companyId = response.company_id || response.companyId;
+              
+              // If the stored user doesn't have company_id or it's different, update it
+              if (!storedUser.company_id || storedUser.company_id !== companyId) {
+                console.log("Updating company_id from token validation:", companyId);
+                
+                // Update the user with the correct company_id
+                const updatedUser = {
+                  ...storedUser,
+                  company_id: companyId,
+                  company: response.companyName || storedUser.company
+                };
+                
+                // Store the updated user
+                localStorage.setItem("user", JSON.stringify(updatedUser));
+                setUser(updatedUser);
+              }
+            }
           }
         } catch (validationError) {
           // Keep the user logged in if backend validation fails
@@ -184,6 +213,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         { email, password }, 
         false
       );
+      
+      // Log raw data for debugging
+      console.log("Raw login response data:", data);
+      
+      // Extract company_id from JWT token if it's an employer user
+      let companyIdFromToken: number | undefined;
+      if (data.token && (data.userType === "employer" || data.userType === "RESPONSIBLE")) {
+        try {
+          // JWT tokens consist of three parts separated by dots
+          const parts = data.token.split('.');
+          if (parts.length === 3) {
+            // The second part (parts[1]) contains the payload
+            const payload = JSON.parse(atob(parts[1]));
+            console.log("JWT token payload:", payload);
+            
+            // Extract company_id from the token payload
+            if (payload.company_id) {
+              companyIdFromToken = payload.company_id;
+              console.log("Found company_id in token:", companyIdFromToken);
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing JWT token:", e);
+        }
+      }
       
       // Validate required fields from response
       if (!data.id || !data.firstName || !data.lastName || !data.email || !data.userType) {
@@ -218,10 +272,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (data.companyName) {
           user.company = data.companyName;
         }
-        if (data.company_id) {
-          user.company_id = data.company_id;
+        
+        // Handle company_id from different possible properties, prioritizing token data
+        const companyId = companyIdFromToken || data.company_id || data.companyId;
+        if (companyId) {
+          user.company_id = typeof companyId === 'string' ? parseInt(companyId) : companyId;
+          console.log("Set company_id to:", user.company_id);
         }
       }
+      
+      // Log the constructed user object
+      console.log("Constructed user object:", user);
       
       // Store token and user in localStorage using the helper function
       saveAuthData(data.token, user);
@@ -248,7 +309,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       // Make real API call to the register endpoint using our API utility
-      await api.post<RegisterResponse>(
+      const response = await api.post<RegisterResponse>(
         '/api/auth/register', 
         {
           firstName,
@@ -260,6 +321,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }, 
         false
       );
+      
+      console.log("Registration response:", response);
+      
+      // For employer registrations with token returned, auto-login
+      if (response.success && response.token && response.id && role === 'employer') {
+        console.log("Auto-logging in after employer registration");
+        await login(email, password);
+      }
       
       // Registration successful
       return;

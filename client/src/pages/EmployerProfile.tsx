@@ -687,6 +687,9 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
       }
 
       console.log('Starting to fetch data for profile:', profileId);
+      console.log('Current user data:', user);
+      console.log('User company_id:', user?.company_id);
+      console.log('JWT extracted company_id check');
 
       try {
         // Fetch company data
@@ -707,8 +710,13 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
 
         // Set profile ownership
         const parsedProfileId = parseInt(profileId);
-        setIsOwnProfile(user?.company_id === parsedProfileId);
-        console.log('Profile ownership set:', user?.company_id === parsedProfileId);
+        const isOwner = user?.company_id === parsedProfileId;
+        console.log('Profile ownership check:', {
+          userCompanyId: user?.company_id,
+          parsedProfileId,
+          isOwner
+        });
+        setIsOwnProfile(isOwner);
 
         // Check connection status
         if (user && user.id && profileId !== user.id.toString()) {
