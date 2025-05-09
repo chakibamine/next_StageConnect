@@ -68,6 +68,8 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { internshipApi, applicationApi } from "@/services/api";
+import axios from "axios";
+import WebSocketService from "@/services/WebSocketService";
 
 // Define internship type based on API response
 type Internship = {
@@ -110,6 +112,12 @@ type Application = {
   interviewDate?: string;
   interviewTime?: string;
   feedback?: string;
+  // Add applicantId field - this is the user ID of the student
+  applicantId?: number;
+  // Add question answers if available
+  questionAnswers?: {
+    [key: string]: string;
+  };
   // New fields for detailed applicant information
   applicant?: {
     id: number;
@@ -164,6 +172,114 @@ export default function EmployerDashboard() {
   // API fetch management
   const [isLoadingApplications, setIsLoadingApplications] = useState(false);
   const [applicationError, setApplicationError] = useState<string | null>(null);
+  
+  // Add the messaging functions inside the component
+  // Function to send a message to a user
+  const sendMessage = async (receiverId: number, content: string) => {
+    try {
+      // Make sure we have a valid user
+      if (!user || !user.id) {
+        toast({
+          title: "Authentication Required",
+          description: "You must be logged in to send messages",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
+      // 1. Send via REST API for persistence
+      const response = await axios.post(
+        `${API_BASE_URL}/api/messages/send`,
+        {
+          sender_id: user.id,
+          receiver_id: receiverId,
+          content: content
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          withCredentials: true
+        }
+      );
+
+      // 2. Also send via WebSocket for real-time delivery
+      if (WebSocketService.isConnected()) {
+        WebSocketService.sendChatMessage(receiverId, content);
+      } else {
+        
+        // Connect WebSocket first then send
+        await WebSocketService.connect(user.id);
+        WebSocketService.sendChatMessage(receiverId, content);
+      }
+
+      toast({
+        title: "Message Sent",
+        description: "Your message has been sent successfully"
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  // Function to send a message to an applicant with templates based on status
+  const sendApplicantMessage = (applicant: Application) => {
+    // Get applicant ID - now using the applicantId field from API response first
+    const applicantId = applicant.applicantId || 
+                       applicant.applicant?.id || 
+                       (applicant.id ? parseInt(applicant.id) : null);
+    
+    console.log("=== Sending Applicant Message ===");
+    console.log("Applicant Data:", applicant);
+    console.log("Using applicantId:", applicantId);
+    
+    if (!applicantId) {
+      console.error("Could not determine applicant ID");
+      toast({
+        title: "Error",
+        description: "Could not determine applicant ID",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Create message content based on application status
+    let messageContent = "";
+    
+    switch(applicant.status) {
+      case "pending":
+        messageContent = `Hello ${applicant.applicantName}, we're currently reviewing your application for the "${applicant.internshipTitle}" position. We'll update you soon.`;
+        break;
+      case "interview":
+        const interviewInfo = applicant.interviewDate ? 
+          ` We've scheduled your interview for ${applicant.interviewDate} at ${applicant.interviewTime || "TBD"}.` : 
+          " We'd like to schedule an interview with you. Please check your email for details.";
+        
+        messageContent = `Hello ${applicant.applicantName}, thank you for your application for the "${applicant.internshipTitle}" position.${interviewInfo} Please let us know if you have any questions.`;
+        break;
+      case "accepted":
+        messageContent = `Congratulations ${applicant.applicantName}! We're pleased to inform you that your application for the "${applicant.internshipTitle}" position has been accepted. We'll be in touch with next steps soon.`;
+        break;
+      case "rejected":
+        messageContent = `Hello ${applicant.applicantName}, thank you for your interest in the "${applicant.internshipTitle}" position. After careful consideration, we've decided to pursue other candidates at this time. We appreciate your interest and wish you success in your job search.`;
+        break;
+      default:
+        messageContent = `Hello ${applicant.applicantName}, thank you for your application for the "${applicant.internshipTitle}" position. We'll be in touch soon.`;
+    }
+    
+    // Send the message
+    sendMessage(applicantId, messageContent);
+  };
   
   // Form state
   const [internshipForm, setInternshipForm] = useState({
@@ -393,8 +509,6 @@ export default function EmployerDashboard() {
 
   // Helper function to fetch applications
   const fetchApplicationsForInternships = async () => {
-    if (!user || !user.company_id) return;
-    
     setIsLoadingApplications(true);
     setApplicationError(null);
     
@@ -409,12 +523,28 @@ export default function EmployerDashboard() {
           // Convert the internship.id to string for API call
           const internshipId = internship.id.toString();
           const response = await applicationApi.getApplications(internshipId);
+          console.log("response from getApplications", response);
+          
+          // Check if we have a valid response with content
+          if (!response.content || !Array.isArray(response.content)) {
+            console.warn(`Invalid response format for internship ${internshipId}:`, response);
+            throw new Error("Invalid response format: content array missing");
+          }
+          
+          // Check for the case where totalItems > 0 but content is empty
+          if (response.totalItems > 0 && response.content.length === 0) {
+            console.warn(`API reports ${response.totalItems} items but returned empty content array for internship ${internshipId}`);
+            // Consider this a partial failure
+            appsByInternship[internshipId] = [];
+            continue;
+          }
           
           // Map the API response to our Application type
+          console.log("response.content", response.content)
           const mappedApplications = response.content.map((app: any) => ({
             id: app.id.toString(),
             internshipId: internshipId,
-            internshipTitle: internship.title,
+            internshipTitle: app.internshipTitle || internship.title,
             applicantName: app.applicantName || "Applicant",
             applicantPhoto: app.applicantPhoto || "https://randomuser.me/api/portraits/lego/1.jpg",
             university: app.applicant?.university || "Unknown University",
@@ -422,7 +552,7 @@ export default function EmployerDashboard() {
             phone: app.applicantPhoneNumber || app.applicant?.phone || "N/A",
             portfolio: app.applicant?.website || undefined,
             skills: app.applicant?.skills || [],
-            coverLetter: app.coverLetter || "No cover letter provided",
+            coverLetter: app.coverLetter || "",
             // Convert API status to our format (pending, interview, accepted, rejected)
             status: app.status?.toLowerCase() === "pending" ? "pending" :
                    app.status?.toLowerCase() === "interview_scheduled" ? "interview" :
@@ -431,20 +561,34 @@ export default function EmployerDashboard() {
             appliedAt: app.createdAt || new Date().toISOString(),
             interviewDate: app.interviewDate,
             interviewTime: app.interviewTime,
+            // IMPORTANT: Store the applicantId for messaging - this is the actual student user ID we need
+            applicantId: app.applicantId,
             // Add the full applicant details if available
-            applicant: app.applicant
+            applicant: app.applicant,
+            // Add question answers if available
+            questionAnswers: app.questionAnswers
           })) as Application[];
           
           appsByInternship[internshipId] = mappedApplications;
           allApplications = [...allApplications, ...mappedApplications];
         } catch (error) {
-          console.error(`Error fetching applications for internship ${internship.id}:`, error);
-          // Continue with other internships even if one fails
+          // Individual internship application fetch failed - continue with others
+          console.warn(`Application fetch for internship ${internship.id} failed, using empty data:`, error);
+          // Set empty applications for this internship ID
+          appsByInternship[internship.id.toString()] = [];
         }
       }
       
       setApplicationsByInternship(appsByInternship);
       setApplications(allApplications);
+      
+      // Show a warning if we had partial failures
+      if (Object.keys(appsByInternship).some(key => appsByInternship[key].length === 0)) {
+        toast({
+          title: "Data Inconsistency",
+          description: "Some application data is unavailable. The server reports applications exist but couldn't return them. Please try again later or contact support if this persists."
+        });
+      }
     } catch (error) {
       console.error("Error fetching applications:", error);
       setApplicationError("Failed to fetch applications");
@@ -469,7 +613,7 @@ export default function EmployerDashboard() {
     }
   }, [refreshApplications, internships]);
 
-  // Update applicant status with API call
+  // Modify the updateApplicantStatus function to only update status without sending messages
   const updateApplicantStatus = async (applicationId: string, newStatus: string) => {
     try {
       // Convert our status format to API format
@@ -519,7 +663,7 @@ export default function EmployerDashboard() {
       console.log("API response:", result);
       
       // Update local state after successful API call
-    setApplications(applications.map(app => 
+      setApplications(applications.map(app => 
         app.id === applicationId ? {
           ...app, 
           status: newStatus as any,
@@ -537,6 +681,9 @@ export default function EmployerDashboard() {
         title: "Status updated",
         description: `Application status has been changed to ${newStatus} (API: ${apiStatus})`,
       });
+      
+      // Removed the automatic message sending when updating status
+      // This way, messages are only sent when explicitly clicking the "Message Applicant" button
     } catch (error) {
       console.error("Error updating application status:", error);
       toast({
@@ -621,6 +768,9 @@ export default function EmployerDashboard() {
         title: "Changes saved",
         description: `Applicant status set to: ${currentApplicant.status}`,
       });
+      
+      // Removed the automatic message sending when saving changes
+      // This way, messages are only sent when explicitly clicking the "Message Applicant" button
       
       setShowApplicantView(false);
     } catch (error) {
@@ -714,123 +864,60 @@ export default function EmployerDashboard() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Company Dashboard</h1>
-          <p className="text-muted-foreground">Manage internships and applications for {companyInfo.name}</p>
-        </div>
-        <Button 
-          onClick={() => {
-            setCurrentInternship(null);
-            setIsViewMode(false);
-            setShowInternshipForm(true);
-          }}
-          className="gap-2 bg-[#0A77FF] hover:bg-[#0A77FF]/90 text-white"
-        >
-          <Plus className="h-4 w-4" /> Post New Internship
-        </Button>
-      </div>
-
-      <div className="flex items-center mb-8 bg-card rounded-xl shadow-sm border">
-        <div className="p-6 flex items-center">
-          <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center overflow-hidden mr-5">
-            {companyInfo.logo ? (
-              <img src={companyInfo.logo} alt={companyInfo.name} className="w-full h-full object-cover" />
-            ) : (
-              <BuildingIcon className="h-8 w-8 text-muted-foreground" />
-            )}
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">{companyInfo.name}</h2>
-            <p className="text-muted-foreground text-sm">
-              {companyInfo.activeInternships} active internships • {companyInfo.totalPositions} total positions
-            </p>
-          </div>
-        </div>
-        <div className="ml-auto flex items-center pr-6 gap-4">
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground mb-1">Application Response Rate</p>
-            <p className="text-xl font-semibold text-[#0A77FF]">94%</p>
-          </div>
-          <div className="h-10 border-l border-border"></div>
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground mb-1">Average Hiring Time</p>
-            <p className="text-xl font-semibold text-[#0A77FF]">9 days</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="border-none shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
+      <div className="relative mb-10">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-800 rounded-2xl opacity-10 blur-xl"></div>
+        <div className="bg-white/60 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl p-6 relative z-10">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="flex items-center gap-5">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center overflow-hidden shadow-md">
+                {companyInfo.logo ? (
+                  <img src={companyInfo.logo} alt={companyInfo.name} className="w-full h-full object-cover" />
+                ) : (
+                  <BuildingIcon className="h-8 w-8 text-white" />
+                )}
+              </div>
               <div>
-                <p className="text-sm text-neutral-500 mb-1">Total Internships</p>
-                <h3 className="text-2xl font-bold">{stats.totalInternships}</h3>
-                <div className="flex items-center mt-1">
-                  <Badge variant="secondary" className="text-xs">
-                    {stats.activeInternships} Active
-                  </Badge>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-700 to-indigo-800 bg-clip-text text-transparent">Internship Management</h1>
+                <p className="text-slate-600">Manage active openings and review qualified applications</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap md:flex-nowrap items-center gap-3">
+              <div className="px-4 py-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                    <BriefcaseIcon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Active Positions</p>
+                    <h3 className="text-xl font-bold text-slate-800">{stats.activeInternships}</h3>
+                  </div>
                 </div>
               </div>
-              <div className="p-3 bg-[#0A77FF]/10 text-[#0A77FF] rounded-full">
-                <BriefcaseIcon className="h-5 w-5" />
+              <div className="px-4 py-3 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-100 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                    <UsersIcon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Pending Review</p>
+                    <h3 className="text-xl font-bold text-slate-800">{stats.pendingApplications}</h3>
+                  </div>
+                </div>
+              </div>
+              <div className="px-4 py-3 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl border border-emerald-100 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                    <TrendingUpIcon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Conversion Rate</p>
+                    <h3 className="text-xl font-bold text-slate-800">{Math.round((stats.acceptedApplications / stats.totalApplications) * 100)}%</h3>
+                  </div>
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-none shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm text-neutral-500 mb-1">Applications</p>
-                <h3 className="text-2xl font-bold">{stats.totalApplications}</h3>
-                <p className="text-xs text-green-600 flex items-center mt-1">
-                  <TrendingUpIcon className="h-3 w-3 mr-1" /> 
-                  +5 this week
-                </p>
-              </div>
-              <div className="p-3 bg-[#0A77FF]/10 text-[#0A77FF] rounded-full">
-                <UsersIcon className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-none shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm text-neutral-500 mb-1">Interviews</p>
-                <h3 className="text-2xl font-bold">{stats.interviewingApplications}</h3>
-                <p className="text-xs text-neutral-500 flex items-center mt-1">
-                  Next in 2 days
-                </p>
-              </div>
-              <div className="p-3 bg-[#0A77FF]/10 text-[#0A77FF] rounded-full">
-                <CalendarIcon className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-none shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm text-neutral-500 mb-1">Pending Review</p>
-                <h3 className="text-2xl font-bold">{stats.pendingApplications}</h3>
-                <p className="text-xs text-amber-600 flex items-center mt-1">
-                  Requires attention
-                </p>
-              </div>
-              <div className="p-3 bg-[#0A77FF]/10 text-[#0A77FF] rounded-full">
-                <ClockIcon className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       <Tabs 
@@ -838,34 +925,25 @@ export default function EmployerDashboard() {
         onValueChange={setActiveTab}
         className="space-y-6"
       >
-        <div className="bg-background rounded-lg border p-1">
-          <TabsList className="w-full grid grid-cols-3 bg-muted/50 p-1 h-auto">
+        <div className="bg-background rounded-lg border shadow-sm p-1">
+          <TabsList className="w-full grid grid-cols-2 bg-muted/50 p-1 h-auto">
             <TabsTrigger 
               value="overview" 
               className={cn(
-                "rounded text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
-                "py-2"
+                "rounded text-sm data-[state=active]:bg-white data-[state=active]:text-[#0A77FF] data-[state=active]:shadow",
+                "py-3 font-medium"
               )}
             >
-              Overview
-            </TabsTrigger>
-            <TabsTrigger 
-              value="internships" 
-              className={cn(
-                "rounded text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
-                "py-2"
-              )}
-            >
-              Internships
+              Dashboard Overview
             </TabsTrigger>
             <TabsTrigger 
               value="applications" 
               className={cn(
-                "rounded text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
-                "py-2"
+                "rounded text-sm data-[state=active]:bg-white data-[state=active]:text-[#0A77FF] data-[state=active]:shadow",
+                "py-3 font-medium"
               )}
             >
-              Applications
+              Applications Manager
             </TabsTrigger>
           </TabsList>
         </div>
@@ -873,23 +951,28 @@ export default function EmployerDashboard() {
         <TabsContent value="overview" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="border-none shadow-sm lg:col-span-2">
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-3 border-b">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-xl">Recent Applications</CardTitle>
-                  <Button variant="outline" size="sm" className="h-8 gap-1 text-[#0A77FF] border-[#0A77FF] hover:bg-[#0A77FF]/5">
+                  <CardTitle className="text-xl font-semibold">Recent Applications</CardTitle>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 gap-1 text-[#0A77FF] border-[#0A77FF]/30 hover:bg-[#0A77FF]/5"
+                    onClick={() => setActiveTab("applications")}
+                  >
                     View All <ChevronDownIcon className="h-3 w-3" />
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+              <CardContent className="p-0">
+                <div className="divide-y">
                   {getFilteredApplications("all").slice(0, 3).map((application: Application) => (
                     <div 
                       key={application.id} 
-                      className="flex items-center p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                      className="flex items-center p-4 hover:bg-muted/30 cursor-pointer transition-colors"
                       onClick={() => viewApplicantDetails(application)}
                     >
-                      <Avatar className="h-10 w-10 mr-4">
+                      <Avatar className="h-10 w-10 mr-4 border">
                         <AvatarImage 
                           src={application.applicantPhoto} 
                           alt={application.applicantName} 
@@ -903,43 +986,63 @@ export default function EmployerDashboard() {
                         <div className="flex justify-between items-start">
                           <div>
                             <h3 className="font-medium">{application.applicantName}</h3>
-                            <p className="text-sm text-muted-foreground">{application.internshipTitle}</p>
+                            <p className="text-sm text-muted-foreground flex items-center">
+                              <BriefcaseIcon className="h-3 w-3 mr-1 inline" />
+                              {application.internshipTitle}
+                            </p>
                           </div>
                           <Badge 
-                            className={
+                            className={cn(
+                              "rounded-full px-3",
                               application.status === "pending" ? "bg-amber-100 text-amber-700" :
                               application.status === "interview" ? "bg-[#0A77FF]/10 text-[#0A77FF]" :
                               application.status === "accepted" ? "bg-green-100 text-green-700" :
                               "bg-red-100 text-red-700"
-                            }
+                            )}
                           >
-                            {application.status === "pending" ? "Pending Review" :
-                             application.status === "interview" ? "Interview Scheduled" :
+                            {application.status === "pending" ? "Pending" :
+                             application.status === "interview" ? "Interview" :
                              application.status === "accepted" ? "Accepted" : "Rejected"}
                           </Badge>
                         </div>
                         <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                          <span>Applied {formatRelativeTime(application.appliedAt)}</span>
+                          <span className="flex items-center">
+                            <CalendarIcon className="h-3 w-3 mr-1" />
+                            Applied {formatRelativeTime(application.appliedAt)}
+                          </span>
                           {application.interviewDate && (
-                            <span>Interview: {application.interviewDate} at {application.interviewTime}</span>
+                            <span className="flex items-center">
+                              <ClockIcon className="h-3 w-3 mr-1" />
+                              Interview: {application.interviewDate}
+                            </span>
                           )}
                         </div>
                       </div>
                     </div>
                   ))}
+                  
+                  {getFilteredApplications("all").length === 0 && (
+                    <div className="text-center py-8">
+                      <UsersIcon className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
+                      <p className="text-muted-foreground">No applications yet</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
             
             <Card className="border-none shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-xl">Application Status</CardTitle>
+              <CardHeader className="pb-3 border-b">
+                <CardTitle className="text-xl font-semibold">Applications Status</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
                 <div className="space-y-6">
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex justify-between text-sm">
-                      <span className="text-neutral-600">Pending</span>
+                      <span className="text-neutral-600 flex items-center">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 mr-2"></span>
+                        Pending Review
+                      </span>
                       <span className="text-[#0A77FF] font-medium">{stats.pendingApplications}</span>
                     </div>
                     <div className="h-2 w-full bg-[#0A77FF]/10 rounded-full overflow-hidden">
@@ -950,9 +1053,12 @@ export default function EmployerDashboard() {
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex justify-between text-sm">
-                      <span className="text-neutral-600">Interviews</span>
+                      <span className="text-neutral-600 flex items-center">
+                        <span className="w-2 h-2 rounded-full bg-[#0A77FF] mr-2"></span>
+                        Interview Stage
+                      </span>
                       <span className="text-[#0A77FF] font-medium">{stats.interviewingApplications}</span>
                     </div>
                     <div className="h-2 w-full bg-[#0A77FF]/10 rounded-full overflow-hidden">
@@ -963,9 +1069,12 @@ export default function EmployerDashboard() {
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex justify-between text-sm">
-                      <span className="text-neutral-600">Accepted</span>
+                      <span className="text-neutral-600 flex items-center">
+                        <span className="w-2 h-2 rounded-full bg-green-500 mr-2"></span>
+                        Accepted
+                      </span>
                       <span className="text-[#0A77FF] font-medium">{stats.acceptedApplications}</span>
                     </div>
                     <div className="h-2 w-full bg-[#0A77FF]/10 rounded-full overflow-hidden">
@@ -976,9 +1085,12 @@ export default function EmployerDashboard() {
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex justify-between text-sm">
-                      <span className="text-neutral-600">Rejected</span>
+                      <span className="text-neutral-600 flex items-center">
+                        <span className="w-2 h-2 rounded-full bg-red-500 mr-2"></span>
+                        Rejected
+                      </span>
                       <span className="text-[#0A77FF] font-medium">{stats.rejectedApplications}</span>
                     </div>
                     <div className="h-2 w-full bg-[#0A77FF]/10 rounded-full overflow-hidden">
@@ -989,23 +1101,21 @@ export default function EmployerDashboard() {
                     </div>
                   </div>
                 </div>
+                
+                <div className="mt-4 pt-4 border-t">
+                  <div className="text-sm text-center text-muted-foreground">
+                    <span className="block font-medium text-foreground mb-1">Total Applications</span>
+                    <span className="text-xl font-bold text-[#0A77FF]">{stats.totalApplications}</span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
           
           <Card className="border-none shadow-sm">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl">Your Internships</CardTitle>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="h-8 gap-1 text-[#0A77FF] border-[#0A77FF] hover:bg-[#0A77FF]/5"
-                  onClick={() => setActiveTab("internships")}
-                >
-                  Manage All <ChevronDownIcon className="h-3 w-3" />
-                </Button>
-              </div>
+              <CardTitle className="text-xl">Your Internships</CardTitle>
+              <CardDescription>Manage all your internship listings</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -1610,86 +1720,75 @@ export default function EmployerDashboard() {
         <TabsContent value="applications">
           <div className="space-y-6">
             <Card className="border-none shadow-sm">
-              <CardHeader>
+              <CardHeader className="pb-3 border-b">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-xl">All Applications</CardTitle>
-                    <CardDescription>Review and manage incoming applications</CardDescription>
+                    <CardTitle className="text-xl font-semibold">All Applications</CardTitle>
+                    <CardDescription>Review and manage applications for all positions</CardDescription>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <SearchIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                       <Input 
                         placeholder="Search applications..." 
-                        className="pl-9 w-[240px] border-input focus-visible:ring-[#0A77FF]"
+                        className="pl-9 w-[240px] focus-visible:ring-[#0A77FF]"
                       />
                     </div>
-                    <div className="relative">
-                      <Tabs value={applicantStatusFilter} onValueChange={setApplicantStatusFilter} className="w-[400px]">
-                        <TabsList className="bg-muted/50 p-1 h-auto">
-                          <TabsTrigger 
-                            value="all" 
-                            className={cn(
-                              "rounded text-sm data-[state=active]:bg-[#0A77FF] data-[state=active]:text-white",
-                              "py-1.5 px-3"
-                            )}
-                          >
-                            All
-                          </TabsTrigger>
-                          <TabsTrigger 
-                            value="pending" 
-                            className={cn(
-                              "rounded text-sm data-[state=active]:bg-[#0A77FF] data-[state=active]:text-white",
-                              "py-1.5 px-3"
-                            )}
-                          >
-                            Pending
-                          </TabsTrigger>
-                          <TabsTrigger 
-                            value="interview" 
-                            className={cn(
-                              "rounded text-sm data-[state=active]:bg-[#0A77FF] data-[state=active]:text-white",
-                              "py-1.5 px-3"
-                            )}
-                          >
-                            Interview
-                          </TabsTrigger>
-                          <TabsTrigger 
-                            value="accepted" 
-                            className={cn(
-                              "rounded text-sm data-[state=active]:bg-[#0A77FF] data-[state=active]:text-white",
-                              "py-1.5 px-3"
-                            )}
-                          >
-                            Accepted
-                          </TabsTrigger>
-                          <TabsTrigger 
-                            value="rejected" 
-                            className={cn(
-                              "rounded text-sm data-[state=active]:bg-[#0A77FF] data-[state=active]:text-white",
-                              "py-1.5 px-3"
-                            )}
-                          >
-                            Rejected
-                          </TabsTrigger>
-                        </TabsList>
-                      </Tabs>
-                    </div>
+                    <Tabs value={applicantStatusFilter} onValueChange={setApplicantStatusFilter} className="w-[400px]">
+                      <TabsList className="bg-[#0A77FF]/10 p-1 h-auto">
+                        <TabsTrigger 
+                          value="all" 
+                          className={cn(
+                            "rounded text-sm data-[state=active]:bg-[#0A77FF] data-[state=active]:text-white",
+                            "py-1.5 px-3"
+                          )}
+                        >
+                          All
+                        </TabsTrigger>
+                        <TabsTrigger 
+                          value="pending" 
+                          className={cn(
+                            "rounded text-sm data-[state=active]:bg-[#0A77FF] data-[state=active]:text-white",
+                            "py-1.5 px-3"
+                          )}
+                        >
+                          Pending
+                        </TabsTrigger>
+                        <TabsTrigger 
+                          value="interview" 
+                          className={cn(
+                            "rounded text-sm data-[state=active]:bg-[#0A77FF] data-[state=active]:text-white",
+                            "py-1.5 px-3"
+                          )}
+                        >
+                          Interview
+                        </TabsTrigger>
+                        <TabsTrigger 
+                          value="accepted" 
+                          className={cn(
+                            "rounded text-sm data-[state=active]:bg-[#0A77FF] data-[state=active]:text-white",
+                            "py-1.5 px-3"
+                          )}
+                        >
+                          Accepted
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+              <CardContent className="p-0">
+                <div className="divide-y">
                   {applications
                     .filter(application => applicantStatusFilter === "all" || application.status === applicantStatusFilter)
                     .map((application) => (
                     <div 
                       key={application.id} 
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                      className="flex items-center justify-between p-4 hover:bg-muted/30 cursor-pointer transition-colors"
                       onClick={() => viewApplicantDetails(application)}
                     >
                       <div className="flex items-center">
-                        <Avatar className="h-10 w-10 mr-4">
+                        <Avatar className="h-10 w-10 mr-4 border">
                           <AvatarImage 
                             src={application.applicantPhoto} 
                             alt={application.applicantName} 
@@ -1701,9 +1800,15 @@ export default function EmployerDashboard() {
                         <div>
                           <h4 className="font-medium">{application.applicantName}</h4>
                           <div className="flex items-center">
-                            <p className="text-sm text-muted-foreground">{application.internshipTitle}</p>
-                            <span className="mx-2 text-muted-foreground">•</span>
-                            <p className="text-sm text-muted-foreground">{application.university}</p>
+                            <p className="text-sm text-muted-foreground flex items-center">
+                              <BriefcaseIcon className="h-3 w-3 mr-1" />
+                              {application.internshipTitle}
+                            </p>
+                            <span className="mx-2 text-muted-foreground text-xs">•</span>
+                            <p className="text-sm text-muted-foreground flex items-center">
+                              <GraduationCapIcon className="h-3 w-3 mr-1" />
+                              {application.university}
+                            </p>
                           </div>
                           {application.status === "interview" && application.interviewDate && (
                             <div className="mt-1 inline-flex items-center text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
@@ -1715,7 +1820,7 @@ export default function EmployerDashboard() {
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-xs text-muted-foreground">
-                          <CalendarIcon className="h-3 w-3 inline mr-1" />
+                          <ClockIcon className="h-3 w-3 inline mr-1" />
                           {formatRelativeTime(application.appliedAt)}
                         </div>
                         <Badge className={
@@ -1885,16 +1990,36 @@ export default function EmployerDashboard() {
                           <div className="bg-muted/30 p-3 rounded-md max-h-40 overflow-y-auto text-sm">
                             {currentApplicant.coverLetter || "No cover letter provided"}
                           </div>
+                        </div>
+                        
+                        {/* Display question answers if available */}
+                        {currentApplicant.questionAnswers && Object.keys(currentApplicant.questionAnswers).length > 0 && (
+                          <div className="border rounded-lg p-4">
+                            <h3 className="font-medium mb-2">Application Questions</h3>
+                            <div className="bg-muted/30 p-3 rounded-md max-h-60 overflow-y-auto text-sm">
+                              {Object.entries(currentApplicant.questionAnswers).map(([question, answer]) => (
+                                <div key={question} className="mb-3">
+                                  <p className="font-medium mb-1">
+                                    {question === "whyInterested" ? "Why are you interested?" :
+                                     question === "availableDate" ? "When can you start?" :
+                                     question === "relevantExperience" ? "Relevant experience" :
+                                     question.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                                  </p>
+                                  <p className="text-muted-foreground">{answer}</p>
+                                </div>
+                              ))}
+                            </div>
                           </div>
+                        )}
                         
                         {currentApplicant.applicant?.about && (
                           <div className="border rounded-lg p-4">
                             <h3 className="font-medium mb-2">About</h3>
                             <div className="bg-muted/30 p-3 rounded-md max-h-40 overflow-y-auto text-sm">
                               {currentApplicant.applicant.about}
-                          </div>
                             </div>
-                          )}
+                          </div>
+                        )}
                         
                         <div className="border rounded-lg p-4">
                           <h3 className="font-medium mb-3">Application Status</h3>
@@ -1929,57 +2054,69 @@ export default function EmployerDashboard() {
                                 >
                                   Reject
                                 </Button>
-                        </div>
-                      </div>
+                              </div>
+                            </div>
 
                             {currentApplicant.status === "interview" && (
                               <div className="border-t pt-3 mt-3">
                                 <h4 className="text-sm font-medium mb-2">Schedule Interview</h4>
                                 <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-2">
-                            <Label htmlFor="interviewDate">Date</Label>
-                            <Input 
-                              id="interviewDate"
-                              type="date"
-                              value={interviewDate}
-                              onChange={(e) => setInterviewDate(e.target.value)}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="interviewTime">Time</Label>
-                            <Input 
-                              id="interviewTime"
-                              type="time"
-                              value={interviewTime}
-                              onChange={(e) => setInterviewTime(e.target.value)}
-                            />
-                          </div>
-                        </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="interviewDate">Date</Label>
+                                    <Input 
+                                      id="interviewDate"
+                                      type="date"
+                                      value={interviewDate}
+                                      onChange={(e) => setInterviewDate(e.target.value)}
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="interviewTime">Time</Label>
+                                    <Input 
+                                      id="interviewTime"
+                                      type="time"
+                                      value={interviewTime}
+                                      onChange={(e) => setInterviewTime(e.target.value)}
+                                    />
+                                  </div>
+                                </div>
                               </div>
                             )}
 
                             <div className="border-t pt-3 mt-3">
                               <h4 className="text-sm font-medium mb-2">Feedback Notes</h4>
-                          <Textarea 
+                              <Textarea 
                                 placeholder="Add private notes about this applicant..."
-                            value={applicantNotes}
-                            onChange={(e) => setApplicantNotes(e.target.value)}
+                                value={applicantNotes}
+                                onChange={(e) => setApplicantNotes(e.target.value)}
                                 className="min-h-[100px]"
-                          />
-                        </div>
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
 
                     <DialogFooter>
-                      <Button variant="outline" onClick={() => setShowApplicantView(false)}>Cancel</Button>
-                      <Button 
-                        onClick={saveApplicantChanges}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                      >
-                        Save Changes
-                      </Button>
+                      <div className="flex w-full justify-between">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => currentApplicant && sendApplicantMessage(currentApplicant)}
+                          className="gap-2"
+                        >
+                          <MailIcon className="h-4 w-4" />
+                          Message Applicant
+                        </Button>
+                        <div className="flex gap-2">
+                          <Button variant="outline" onClick={() => setShowApplicantView(false)}>Cancel</Button>
+                          <Button 
+                            onClick={saveApplicantChanges}
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                          >
+                            Save Changes
+                          </Button>
+                        </div>
+                      </div>
                     </DialogFooter>
                   </>
                 )}

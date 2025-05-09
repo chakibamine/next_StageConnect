@@ -326,21 +326,45 @@ export const applicationApi = {
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch applications: ${response.statusText}`);
+        console.warn(`Applications fetch error for internship ${internshipId}: ${response.status} ${response.statusText}`);
+        // Return empty data instead of throwing to prevent UI from breaking
+        return {
+          content: [],
+          currentPage: 0,
+          totalItems: 0,
+          totalPages: 0
+        };
       }
 
       const data = await response.json();
       
+      // Handle API inconsistency: if totalItems > 0 but content is empty or missing
+      if (data.totalItems > 0 && (!data.content || !Array.isArray(data.content) || data.content.length === 0)) {
+        console.warn(`API inconsistency: reported ${data.totalItems} items but returned empty content array for internship ${internshipId}`);
+        
+        // Force content to be an empty array to avoid errors
+        data.content = [];
+        
+        // Set totalItems to 0 to match the empty content array
+        data.totalItems = 0;
+      }
+      
       // Format to match PaginatedResponse interface
       return {
-        content: data.applications || [],
-        currentPage: data.currentPage,
-        totalItems: data.totalItems,
-        totalPages: data.totalPages
+        content: data.content || [],
+        currentPage: data.currentPage || 0,
+        totalItems: data.totalItems || 0,
+        totalPages: data.totalPages || 0
       };
     } catch (error) {
       console.error('Error fetching applications:', error);
-      throw error;
+      // Return empty data instead of throwing to prevent UI from breaking
+      return {
+        content: [],
+        currentPage: 0,
+        totalItems: 0,
+        totalPages: 0
+      };
     }
   },
 

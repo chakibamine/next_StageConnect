@@ -49,6 +49,8 @@ import { useRoute, useLocation } from "wouter"; // Import wouter routing hooks
 import { Link } from "wouter";
 import axios from "axios";
 import { connectionService } from "@/services/connectionService";
+import WebSocketService from "@/services/WebSocketService";
+import { applicationApi } from "@/services/api";
 
 // Define employer profile interfaces
 interface CompanyInfo {
@@ -869,7 +871,7 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
     }
   };
 
-  // Update toggleInternshipStatus to use the API
+  // Update toggleInternshipStatus to use the API and send WebSocket messages
   const toggleInternshipStatus = async (id: number) => {
     try {
       const internship = internships.find(int => int.id === id);
@@ -886,6 +888,9 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
           title: `Internship ${newStatus}`,
           description: `${internship.title} is now ${newStatus}.`,
         });
+        
+        // Send WebSocket messages to all applicants
+        await notifyApplicantsOfStatusChange(id, newStatus, internship.title);
       }
     } catch (error) {
       console.error('Error updating internship status:', error);
@@ -894,6 +899,55 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
         description: "Failed to update internship status",
         variant: "destructive",
       });
+    }
+  };
+
+  /**
+   * Send WebSocket notifications to all applicants when internship status changes
+   */
+  const notifyApplicantsOfStatusChange = async (
+    internshipId: number, 
+    newStatus: string, 
+    internshipTitle: string
+  ) => {
+    try {
+      if (!user || !user.id) {
+        console.warn('Cannot send notifications: User not authenticated');
+        return;
+      }
+
+      // Ensure WebSocket is connected
+      if (!WebSocketService.isConnected()) {
+        await WebSocketService.connect(user.id);
+      }
+
+      // Get all applications for this internship to notify applicants
+      const response = await applicationApi.getApplications(internshipId.toString());
+      
+      // PaginatedResponse returns directly with content array
+      const applications = response.content || [];
+      
+      // Send a WebSocket message to each applicant
+      for (const application of applications) {
+        const applicantId = application.userId;
+        
+        if (!applicantId) continue;
+        
+        const message = newStatus === 'active' 
+          ? `The internship "${internshipTitle}" you applied for is now active again and accepting applications.`
+          : `The internship "${internshipTitle}" you applied for has been closed to new applications.`;
+        
+        WebSocketService.sendChatMessage(
+          Number(applicantId),
+          message
+        );
+        
+        console.log(`Sent status change notification to applicant ${applicantId}`);
+      }
+      
+      console.log(`Notifications sent to ${applications.length} applicants`);
+    } catch (error) {
+      console.error('Error sending WebSocket notifications:', error);
     }
   };
 
@@ -1553,7 +1607,7 @@ const EmployerProfile = ({ id, isEditable = true, companyId }: EmployerProfilePr
                             <h3 className="font-medium">{project.title}</h3>
                             <p className="text-neutral-600 text-sm mt-1">{project.description}</p>
                             <div className="flex gap-2 mt-2">
-                              {project.tags.map((tag, index) => (
+                              {project.tags && project.tags.map((tag, index) => (
                                 <Badge key={index} variant="outline">{tag}</Badge>
                               ))}
                             </div>
